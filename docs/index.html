@@ -578,7 +578,7 @@ body.dark .year-btns button {
   <section id="tab-overview" class="tab-content active">
     <div class="hero-section">
       <h1 class="hero-title">Channel One <span class="ru">Первый канал</span><br>Russian News Archive</h1>
-      <p class="hero-sub">144,966 broadcast segment descriptions from Russia's largest state broadcaster, scraped from the 1TV API and machine-translated to English. These are short editorial summaries of TV news segments — not full articles — capturing what Channel One chose to cover each day across 26 years. Each entry is classified into one of 10 categories via supervised learning (TF-IDF + logistic regression, 77% CV accuracy).</p>
+      <p class="hero-sub">144,966 broadcast segment descriptions from Russia's largest state broadcaster, scraped from the 1TV API and machine-translated to English. These are short editorial summaries of TV news segments — not full articles — capturing what Channel One chose to cover each day across 26 years. Each entry is classified into one of 10 categories via supervised learning (dual-language TF-IDF + LinearSVC, 78% CV accuracy). This dashboard updates automatically.</p>
     </div>
     <div class="stat-cards" id="stat-cards"></div>
 
@@ -590,8 +590,8 @@ body.dark .year-btns button {
 
     <div class="glass">
       <h2>Category Breakdown</h2>
-      <p class="note">Supervised classification of all 144,966 segments (TF-IDF + Logistic Regression, 77% CV accuracy)</p>
-      <div class="chart-wrap" style="max-height:360px;"><canvas id="overviewCategories"></canvas></div>
+      <p class="note">Supervised classification of all segments (dual-language TF-IDF + LinearSVC, 78% CV accuracy)</p>
+      <div class="chart-wrap" style="max-height:420px;"><canvas id="overviewCategories"></canvas></div>
     </div>
 
     <div class="glass">
@@ -760,48 +760,47 @@ async function initOverview() {
     options: lineOpts('Articles per month'),
   });
 
-  /* Category doughnut */
+  /* Category horizontal bar */
   if (summary.categories) {
     const CAT_COLORS = {
-      'politika': '#0066cc', 'cultura': '#E9C46A', 'ekonomika': '#2A9D8F',
-      'sport': '#DC2626', 'moskva': '#7C3AED', 'pogoda': '#457B9D',
-      'health': '#059669', 'incidents': '#D62828', 'mir': '#F4A261',
-      'obschestvo': '#BB3E03',
-    };
-    const CAT_LABELS = {
-      'politika': 'Politics', 'cultura': 'Culture', 'ekonomika': 'Economy',
-      'sport': 'Sports', 'moskva': 'Moscow', 'pogoda': 'Weather',
-      'health': 'Health', 'incidents': 'Incidents', 'mir': 'World',
-      'obschestvo': 'Society',
+      'Politics': '#0066cc', 'Culture': '#E9C46A', 'Economy': '#2A9D8F',
+      'Sports': '#DC2626', 'Moscow': '#7C3AED', 'Weather': '#457B9D',
+      'Health': '#059669', 'Incidents': '#D62828', 'World': '#F4A261',
+      'Society': '#BB3E03',
     };
     const cats = summary.categories;
+    const total = cats.reduce((s, c) => s + c.count, 0);
     new Chart(document.getElementById('overviewCategories'), {
-      type: 'doughnut',
+      type: 'bar',
       data: {
-        labels: cats.map(c => CAT_LABELS[c.name] || c.name),
+        labels: cats.map(c => c.name),
         datasets: [{
           data: cats.map(c => c.count),
           backgroundColor: cats.map(c => CAT_COLORS[c.name] || '#888'),
-          borderWidth: 2,
-          borderColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim(),
-          hoverOffset: 8,
+          borderWidth: 0,
+          borderRadius: 4,
+          barPercentage: 0.75,
         }]
       },
       options: {
-        responsive: true, cutout: '50%',
+        indexAxis: 'y',
+        responsive: true,
         plugins: {
-          legend: {
-            position: 'right',
-            labels: { font: { family: 'Space Grotesk', size: 12 }, padding: 14, boxWidth: 14 }
-          },
+          legend: { display: false },
           tooltip: {
             callbacks: {
               label: ctx => {
-                const pct = (ctx.parsed / cats.reduce((s,c) => s+c.count, 0) * 100).toFixed(1);
-                return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
+                const pct = (ctx.parsed.x / total * 100).toFixed(1);
+                return ` ${ctx.parsed.x.toLocaleString()} segments (${pct}%)`;
               }
             }
           }
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: GRID_COLOR(), drawBorder: false },
+            ticks: { font: FONT, callback: v => v >= 1000 ? (v/1000)+'K' : v } },
+          y: { grid: { display: false },
+            ticks: { font: { family: 'Space Grotesk', size: 13, weight: 500 } } }
         }
       }
     });

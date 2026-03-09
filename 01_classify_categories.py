@@ -1,8 +1,9 @@
 """Classify 142K unlabeled 1TV news segments into topic categories.
 
-Uses 2,500 human-labeled segments as training data with TF-IDF features
-and multinomial logistic regression. Small categories are merged into
-semantically related larger ones before training.
+Uses 2,500 human-labeled segments as training data.  Features come from
+two TF-IDF matrices (Russian word n-grams + English word n-grams) stacked
+horizontally, fed into a calibrated LinearSVC.  Small categories are merged
+into semantically related larger ones before training.
 
 Outputs:
   - 1tv_news_classified.csv: full dataset with predicted categories
@@ -10,33 +11,37 @@ Outputs:
 """
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.sparse import hstack
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
 from sklearn.model_selection import cross_val_predict, StratifiedKFold
 from sklearn.metrics import classification_report, accuracy_score
 
 BASE = Path(__file__).parent
 
 # ── Category merging map ──
-# Merge tiny / meta-categories into semantically related larger ones
+# Merge tiny / meta-categories into semantically related larger ones.
+# Final names are English.
 MERGE_MAP = {
-    "safety": "incidents",     # 4 items → security/safety incidents
-    "army": "politika",        # 26 items → military = political
-    "religion": "cultura",     # 27 items → religious = cultural
-    "odnako": "politika",      # 199 items → political commentary show
-    "time": "politika",        # 17 items → news program roundups
+    "safety": "incidents",
+    "army": "politika",
+    "religion": "cultura",
+    "odnako": "politika",
+    "time": "politika",
 }
 
-# Human-readable labels for dashboard
-CATEGORY_LABELS = {
+# Map Russian slug → English category name
+CATEGORY_EN = {
     "politika": "Politics",
-    "ekonomika": "Economy",
+    "economika": "Economy",
     "cultura": "Culture",
-    "sport": "Sport",
+    "sport": "Sports",
     "health": "Health",
     "moskva": "Moscow",
     "pogoda": "Weather",
@@ -45,42 +50,56 @@ CATEGORY_LABELS = {
     "incidents": "Incidents",
 }
 
-
 # Regex to strip section header boilerplate from labeled articles
 # e.g. "News of the Politics section for December 2, 2000"
-import re
 SECTION_HEADER_RE = re.compile(
     r"^News of the.*?(?:section|column|rubric).*?for\b.*?\d{4}",
+    re.IGNORECASE,
+)
+# Same pattern in Russian: "Новости рубрики «Культура» за 29 декабря 2000 года"
+SECTION_HEADER_RU_RE = re.compile(
+    r"^Новости\s+рубрики.*?за\s+",
     re.IGNORECASE,
 )
 
 
 def load_data() -> pd.DataFrame:
-    """Load translated CSV."""
+    """Load translated CSV and build feature text columns."""
     path = BASE / "1tv_news_2000_2026_translated.csv"
     df = pd.read_csv(path, low_memory=False)
 
     # Strip section headers from titles so classifier learns from content
-    title_clean = df["title_en"].fillna("").astype(str).apply(
+    title_en_clean = df["title_en"].fillna("").astype(str).apply(
         lambda t: SECTION_HEADER_RE.sub("", t).strip()
     )
-    # Use cleaned title + raw content as features
+    title_ru_clean = df["title"].fillna("").astype(str).apply(
+        lambda t: SECTION_HEADER_RU_RE.sub("", t).strip()
+    )
+
+    # English feature text
     df["text_en"] = (
-        title_clean + " " + df["content_en"].fillna("").astype(str)
+        title_en_clean + " " + df["content_en"].fillna("").astype(str)
+    )
+    # Russian feature text
+    df["text_ru"] = (
+        title_ru_clean + " " + df["content"].fillna("").astype(str)
     )
     return df
 
 
 def merge_categories(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply category merging map."""
-    df["category_clean"] = df["category"].map(
+    """Apply category merging, then map to English names."""
+    merged = df["category"].map(
         lambda x: MERGE_MAP.get(x, x) if pd.notna(x) else x
+    )
+    df["category_clean"] = merged.map(
+        lambda x: CATEGORY_EN.get(x, x) if pd.notna(x) else x
     )
     return df
 
 
 def train_and_predict(df: pd.DataFrame) -> pd.DataFrame:
-    """Train TF-IDF + LogReg classifier, cross-validate, predict all."""
+    """Train dual-language TF-IDF + LinearSVC, cross-validate, predict all."""
     labeled = df[df["category_clean"].notna()].copy()
     unlabeled = df[df["category_clean"].isna()].copy()
 
@@ -89,29 +108,37 @@ def train_and_predict(df: pd.DataFrame) -> pd.DataFrame:
     print(f"\nCategory distribution (after merging):")
     print(labeled["category_clean"].value_counts().to_string())
 
-    # ── TF-IDF features ──
-    print("\nFitting TF-IDF vectorizer...")
-    tfidf = TfidfVectorizer(
+    # ── TF-IDF features: English word n-grams ──
+    print("\nFitting TF-IDF vectorizers (EN + RU)...")
+    tfidf_en = TfidfVectorizer(
         max_features=15_000,
         ngram_range=(1, 2),
         min_df=3,
         max_df=0.95,
         sublinear_tf=True,
     )
-    X_all = tfidf.fit_transform(df["text_en"])
+    X_en = tfidf_en.fit_transform(df["text_en"])
+
+    # ── TF-IDF features: Russian word n-grams ──
+    tfidf_ru = TfidfVectorizer(
+        max_features=15_000,
+        ngram_range=(1, 2),
+        min_df=3,
+        max_df=0.95,
+        sublinear_tf=True,
+    )
+    X_ru = tfidf_ru.fit_transform(df["text_ru"])
+
+    # Stack both feature matrices
+    X_all = hstack([X_en, X_ru])
     X_labeled = X_all[labeled.index]
     y_labeled = labeled["category_clean"].values
 
     # ── Cross-validation ──
     print("\nRunning 5-fold stratified cross-validation...")
-    clf = LogisticRegression(
-        C=5.0,
-        max_iter=1000,
-        solver="lbfgs",
-        n_jobs=-1,
-    )
+    base_clf = LinearSVC(C=1.0, max_iter=5000, class_weight="balanced")
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    y_pred_cv = cross_val_predict(clf, X_labeled, y_labeled, cv=cv)
+    y_pred_cv = cross_val_predict(base_clf, X_labeled, y_labeled, cv=cv)
 
     acc = accuracy_score(y_labeled, y_pred_cv)
     print(f"\nCross-validation accuracy: {acc:.3f}")
@@ -120,8 +147,9 @@ def train_and_predict(df: pd.DataFrame) -> pd.DataFrame:
     )
     print(classification_report(y_labeled, y_pred_cv, zero_division=0))
 
-    # ── Train on all labeled data and predict ──
-    print("Training final model on all labeled data...")
+    # ── Train calibrated model on all labeled data ──
+    print("Training final calibrated model on all labeled data...")
+    clf = CalibratedClassifierCV(base_clf, cv=5)
     clf.fit(X_labeled, y_labeled)
 
     # Predict unlabeled
@@ -137,14 +165,15 @@ def train_and_predict(df: pd.DataFrame) -> pd.DataFrame:
     # Labeled items get confidence = 1.0 (ground truth)
     df.loc[labeled.index, "pred_confidence"] = 1.0
 
-    # Add human-readable label
-    df["category_label"] = df["category_clean"].map(CATEGORY_LABELS)
+    # category_label = category_clean (both are English now)
+    df["category_label"] = df["category_clean"]
 
     # ── Summary stats ──
     print(f"\n=== PREDICTION SUMMARY ===")
     print(f"Mean confidence (unlabeled): {confidence.mean():.3f}")
     print(f"Median confidence: {np.median(confidence):.3f}")
-    print(f"Low confidence (<0.5): {(confidence < 0.5).sum():,} ({100*(confidence<0.5).mean():.1f}%)")
+    low = (confidence < 0.5).sum()
+    print(f"Low confidence (<0.5): {low:,} ({100*low/len(confidence):.1f}%)")
     print(f"\nPredicted category distribution (all {len(df):,} items):")
     print(df["category_clean"].value_counts().to_string())
 
@@ -165,7 +194,6 @@ def train_and_predict(df: pd.DataFrame) -> pd.DataFrame:
             for k, v in report.items()
             if k not in ("accuracy", "macro avg", "weighted avg")
         },
-        "category_labels": CATEGORY_LABELS,
     }
     out_path = BASE / "docs" / "data" / "classification_report.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)

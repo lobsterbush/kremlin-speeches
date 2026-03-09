@@ -1,0 +1,73 @@
+name: Daily 1TV Update
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC (covers previous day's broadcasts)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of past days to scrape'
+        required: false
+        default: '1'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Cache Argos Translate model
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/argos-translate
+          key: argos-ru-en-v1
+
+      - name: Install dependencies
+        run: |
+          pip install pandas requests scikit-learn scipy argostranslate
+
+      - name: Run daily update
+        run: |
+          python3 update_daily.py --days ${{ github.event.inputs.days || '1' }}
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if ! git diff --quiet docs/ 2>/dev/null || \
+             ! git diff --quiet 1tv_news_2000_2026_translated.csv 2>/dev/null || \
+             ! git diff --quiet 1tv_news_classified.csv 2>/dev/null; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TODAY=$(date -u +%Y-%m-%d)
+          git add docs/ 1tv_news_2000_2026_translated.csv 1tv_news_classified.csv
+          git commit -m "Auto-update: 1TV data for ${TODAY}
+
+          Co-Authored-By: Oz <oz-agent@warp.dev>"
+          git push
