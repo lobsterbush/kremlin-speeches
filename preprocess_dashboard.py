@@ -174,7 +174,7 @@ def top_words_by_year(df: pd.DataFrame) -> None:
 
 
 def search_shards(df: pd.DataFrame) -> None:
-    """Year-sharded search index with both Russian and English titles."""
+    """Year-sharded search index with titles, snippets, word count, category."""
     search_dir = DATA_DIR / "search"
     search_dir.mkdir(parents=True, exist_ok=True)
 
@@ -188,12 +188,21 @@ def search_shards(df: pd.DataFrame) -> None:
             title_ru = str(r.get("title", "")) if pd.notna(r.get("title")) else ""
             if not title_en and not title_ru:
                 continue
-            records.append({
+            content_en = str(r.get("content_en", "")) if pd.notna(r.get("content_en")) else ""
+            content_ru = str(r.get("content", "")) if pd.notna(r.get("content")) else ""
+            cat = str(r.get("category", "")) if pd.notna(r.get("category")) else ""
+            wc = len(content_en.split()) if content_en else 0
+            rec = {
                 "t": title_en[:150],
                 "r": title_ru[:150],
                 "d": str(r["date_extracted"])[:10] if pd.notna(r.get("date_extracted")) else "",
                 "u": str(r["url"]) if pd.notna(r.get("url")) else "",
-            })
+                "s": content_en[:120],
+                "wc": wc,
+            }
+            if cat:
+                rec["cat"] = cat
+            records.append(rec)
         yr = str(int(year))
         (search_dir / f"{yr}.json").write_text(
             json.dumps(records, ensure_ascii=False)

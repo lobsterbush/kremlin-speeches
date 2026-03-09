@@ -256,7 +256,7 @@ main {
   position: absolute;
   bottom: 0; left: 0;
   width: 40px; height: 2px;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), #DC2626);
 }
 .glass .note {
   font-family: var(--font-mono);
@@ -356,19 +356,64 @@ main {
 .search-lang-btns button.active {
   background: var(--accent); color: #fff; border-color: var(--accent);
 }
-#search-results { max-height: 600px; overflow-y: auto; }
+#search-results { max-height: 700px; overflow-y: auto; padding-right: 4px; }
+#search-results::-webkit-scrollbar { width: 6px; }
+#search-results::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); border-radius: 3px; }
+#search-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .result-item {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-light);
-  display: flex; flex-direction: column; gap: 2px;
-  animation: fadeIn 0.2s ease;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: all 0.15s;
 }
-.result-item .en-title { font-size: 0.92rem; color: var(--text-primary); }
-.result-item .ru-title { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
-.result-item .meta {
-  font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);
+.result-item:hover {
+  background: rgba(255,255,255,0.55);
+  border-color: rgba(0,102,204,0.15);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
-.result-item .meta a { color: var(--accent); }
+body.dark .result-item {
+  background: rgba(22,27,34,0.35);
+  border-color: rgba(48,54,61,0.4);
+}
+body.dark .result-item:hover {
+  background: rgba(22,27,34,0.55);
+  border-color: rgba(88,166,255,0.15);
+}
+.result-item .en-title {
+  font-size: 0.95rem; font-weight: 500; color: var(--text-primary); line-height: 1.35;
+}
+.result-item .ru-title {
+  font-size: 0.82rem; color: var(--text-muted); font-style: italic; line-height: 1.3;
+}
+.result-item .snippet {
+  font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45;
+}
+.result-item .result-meta {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted);
+  margin-top: 2px;
+}
+.result-item .result-meta a { color: var(--accent); }
+.result-item .cat-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  background: rgba(0,102,204,0.08);
+  border: 1px solid rgba(0,102,204,0.2);
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.result-item .wc-badge {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
 .result-item strong { color: var(--accent); font-weight: 600; }
 
 /* FOOTER */
@@ -464,6 +509,44 @@ body.dark .year-btns button {
   .tabs { gap: 0; }
   .tab { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
 }
+
+/* Loading spinner */
+.loading-msg {
+  text-align: center; padding: 2rem;
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.loading-msg::after {
+  content: '';
+  display: inline-block;
+  width: 14px; height: 14px;
+  margin-left: 8px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 3rem 1rem;
+  color: var(--text-muted); font-size: 0.9rem;
+}
+.empty-state .big { font-size: 2rem; margin-bottom: 0.5rem; }
+
+/* Stat counter animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stat-card { animation: countUp 0.5s ease both; }
+.stat-card:nth-child(1) { animation-delay: 0.05s; }
+.stat-card:nth-child(2) { animation-delay: 0.1s; }
+.stat-card:nth-child(3) { animation-delay: 0.15s; }
+.stat-card:nth-child(4) { animation-delay: 0.2s; }
+.stat-card:nth-child(5) { animation-delay: 0.25s; }
 
 ::selection { background: var(--accent); color: #fff; }
 </style>
@@ -860,6 +943,8 @@ async function initSearch() {
       doSearch();
     });
   });
+
+  document.getElementById('search-results').innerHTML = '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,944 articles<br><span style="font-size:0.8rem;opacity:0.7">Searches titles, snippets, and metadata in English and Russian</span></div>';
 }
 
 async function loadYear(y) {
@@ -875,7 +960,12 @@ async function doSearch() {
   const out = document.getElementById('search-results');
   const cnt = document.getElementById('result-count');
 
-  if (q.length < 2) { out.innerHTML = ''; cnt.textContent = ''; return; }
+  if (q.length < 2) {
+    out.innerHTML = q.length === 0 ? '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,944 articles</div>' : '';
+    cnt.textContent = '';
+    return;
+  }
+  out.innerHTML = '<div class="loading-msg">Searching</div>';
 
   let articles = [];
   if (yf === 'all') {
@@ -886,9 +976,12 @@ async function doSearch() {
   }
 
   const matches = articles.filter(a => {
-    if (searchLang === 'en') return a.t.toLowerCase().includes(q);
-    if (searchLang === 'ru') return (a.r || '').toLowerCase().includes(q);
-    return a.t.toLowerCase().includes(q) || (a.r || '').toLowerCase().includes(q);
+    const en = a.t.toLowerCase();
+    const ru = (a.r || '').toLowerCase();
+    const sn = (a.s || '').toLowerCase();
+    if (searchLang === 'en') return en.includes(q) || sn.includes(q);
+    if (searchLang === 'ru') return ru.includes(q);
+    return en.includes(q) || ru.includes(q) || sn.includes(q);
   });
 
   const shown = matches.slice(0, 100);
@@ -897,10 +990,19 @@ async function doSearch() {
   out.innerHTML = shown.map(a => {
     const enH = hl(a.t, q);
     const ruH = a.r ? hl(a.r, q) : '';
+    const snippet = a.s ? `<span class="snippet">${hl(a.s, q)}${a.s.length >= 118 ? '…' : ''}</span>` : '';
+    const catBadge = a.cat ? `<span class="cat-badge">${a.cat}</span>` : '';
+    const wcBadge = a.wc ? `<span class="wc-badge">${a.wc} words</span>` : '';
     return `<div class="result-item">
       <span class="en-title">${enH}</span>
       ${ruH ? `<span class="ru-title">${ruH}</span>` : ''}
-      <span class="meta">${a.d} · <a href="${a.u}" target="_blank">1tv.ru ↗</a></span>
+      ${snippet}
+      <div class="result-meta">
+        <span>${a.d}</span>
+        ${catBadge}
+        ${wcBadge}
+        <a href="${a.u}" target="_blank">1tv.ru ↗</a>
+      </div>
     </div>`;
   }).join('');
 }
