@@ -578,18 +578,24 @@ body.dark .year-btns button {
   <section id="tab-overview" class="tab-content active">
     <div class="hero-section">
       <h1 class="hero-title">Channel One <span class="ru">Первый канал</span><br>Russian News Archive</h1>
-      <p class="hero-sub">144,966 news articles from Russia's largest state broadcaster, scraped from the 1TV API and machine-translated from Russian to English. Full bilingual search across 26 years of coverage.</p>
+      <p class="hero-sub">144,966 broadcast segment descriptions from Russia's largest state broadcaster, scraped from the 1TV API and machine-translated to English. These are short editorial summaries of TV news segments — not full articles — capturing what Channel One chose to cover each day across 26 years. Each entry is classified into one of 10 categories via supervised learning (TF-IDF + logistic regression, 77% CV accuracy).</p>
     </div>
     <div class="stat-cards" id="stat-cards"></div>
 
     <div class="glass">
-      <h2>Monthly Article Volume</h2>
-      <p class="note">Articles published per month, 2000–2026</p>
+      <h2>Monthly Broadcast Volume</h2>
+      <p class="note">News segments published per month, 2000–2026</p>
       <div class="chart-wrap"><canvas id="overviewVolume"></canvas></div>
     </div>
 
     <div class="glass">
-      <h2>Average Article Length by Year</h2>
+      <h2>Category Breakdown</h2>
+      <p class="note">Supervised classification of all 144,966 segments (TF-IDF + Logistic Regression, 77% CV accuracy)</p>
+      <div class="chart-wrap" style="max-height:360px;"><canvas id="overviewCategories"></canvas></div>
+    </div>
+
+    <div class="glass">
+      <h2>Average Segment Length by Year</h2>
       <p class="note">Mean character count of English-translated content</p>
       <div class="chart-wrap"><canvas id="overviewLength"></canvas></div>
     </div>
@@ -598,13 +604,13 @@ body.dark .year-btns button {
   <!-- VOLUME -->
   <section id="tab-volume" class="tab-content">
     <div class="glass">
-      <h2>Article Volume Over Time</h2>
-      <p class="note">Monthly count of articles scraped from 1tv.ru</p>
+      <h2>Broadcast Volume Over Time</h2>
+      <p class="note">Monthly count of news segments from 1tv.ru</p>
       <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
     </div>
     <div class="glass">
       <h2>Yearly Breakdown</h2>
-      <p class="note">Total articles and average content length per year</p>
+      <p class="note">Total segments and average content length per year</p>
       <div class="chart-wrap"><canvas id="yearlyChart"></canvas></div>
     </div>
   </section>
@@ -613,7 +619,7 @@ body.dark .year-btns button {
   <section id="tab-keywords" class="tab-content">
     <div class="glass">
       <h2>Keyword Tracker</h2>
-      <p class="note">Percentage of articles mentioning each keyword per month. Click keywords to toggle.</p>
+      <p class="note">Percentage of segments mentioning each keyword per month. Click to toggle.</p>
       <div class="btn-group" id="kw-btns"></div>
       <div class="chart-wrap"><canvas id="kwChart"></canvas></div>
     </div>
@@ -623,7 +629,7 @@ body.dark .year-btns button {
   <section id="tab-countries" class="tab-content">
     <div class="glass">
       <h2>Country Mentions</h2>
-      <p class="note">Percentage of articles mentioning each country per month. Click to toggle.</p>
+      <p class="note">Percentage of segments mentioning each country per month. Click to toggle.</p>
       <div class="btn-group" id="co-btns"></div>
       <div class="chart-wrap"><canvas id="coChart"></canvas></div>
     </div>
@@ -643,7 +649,7 @@ body.dark .year-btns button {
   <section id="tab-search" class="tab-content">
     <div class="glass">
       <h2>Article Search</h2>
-      <p class="note">Search 144,944 articles in English or Russian. Year shards load on demand.</p>
+      <p class="note">Search 144,966 segments in English or Russian. Year shards load on demand.</p>
       <div class="search-wrap">
         <div class="search-row">
           <input type="text" id="q" placeholder="Search titles — e.g. Ukraine, Путин, sanctions...">
@@ -737,9 +743,9 @@ async function initOverview() {
   ]);
 
   document.getElementById('stat-cards').innerHTML = [
-    { n: summary.total_articles.toLocaleString(), l: 'Articles' },
+    { n: summary.total_articles.toLocaleString(), l: 'Segments' },
     { n: summary.years_covered, l: 'Years' },
-    { n: summary.avg_articles_per_day, l: 'Articles/Day' },
+    { n: summary.avg_articles_per_day, l: 'Segments/Day' },
     { n: summary.total_words_millions + 'M', l: 'Words' },
     { n: summary.date_start.slice(0,4) + '–' + summary.date_end.slice(0,4), l: 'Date Range' },
   ].map(s => `<div class="stat-card"><span class="stat-number">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
@@ -754,19 +760,67 @@ async function initOverview() {
     options: lineOpts('Articles per month'),
   });
 
+  /* Category doughnut */
+  if (summary.categories) {
+    const CAT_COLORS = {
+      'politika': '#0066cc', 'cultura': '#E9C46A', 'ekonomika': '#2A9D8F',
+      'sport': '#DC2626', 'moskva': '#7C3AED', 'pogoda': '#457B9D',
+      'health': '#059669', 'incidents': '#D62828', 'mir': '#F4A261',
+      'obschestvo': '#BB3E03',
+    };
+    const CAT_LABELS = {
+      'politika': 'Politics', 'cultura': 'Culture', 'ekonomika': 'Economy',
+      'sport': 'Sports', 'moskva': 'Moscow', 'pogoda': 'Weather',
+      'health': 'Health', 'incidents': 'Incidents', 'mir': 'World',
+      'obschestvo': 'Society',
+    };
+    const cats = summary.categories;
+    new Chart(document.getElementById('overviewCategories'), {
+      type: 'doughnut',
+      data: {
+        labels: cats.map(c => CAT_LABELS[c.name] || c.name),
+        datasets: [{
+          data: cats.map(c => c.count),
+          backgroundColor: cats.map(c => CAT_COLORS[c.name] || '#888'),
+          borderWidth: 2,
+          borderColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim(),
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        responsive: true, cutout: '50%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { font: { family: 'Space Grotesk', size: 12 }, padding: 14, boxWidth: 14 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const pct = (ctx.parsed / cats.reduce((s,c) => s+c.count, 0) * 100).toFixed(1);
+                return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   new Chart(document.getElementById('overviewLength'), {
     type: 'bar',
     data: { labels: yearly.map(d=>d.year), datasets: [{
       data: yearly.map(d=>d.avg_content_len),
-      backgroundColor: 'rgba(0,102,204,0.5)', borderColor: '#0066cc', borderWidth: 1,
-      borderRadius: 3,
+      backgroundColor: yearly.map((_,i) => i%2===0 ? 'rgba(0,102,204,0.5)' : 'rgba(0,102,204,0.35)'),
+      borderColor: '#0066cc', borderWidth: 0,
+      borderRadius: 4,
     }]},
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: false }, ticks: { font: FONT } },
-        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR(), drawBorder: false }, ticks: { font: FONT },
           title: { display: true, text: 'Avg. characters', font: { ...FONT, size: 12 } } }
       }
     }
@@ -944,7 +998,7 @@ async function initSearch() {
     });
   });
 
-  document.getElementById('search-results').innerHTML = '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,944 articles<br><span style="font-size:0.8rem;opacity:0.7">Searches titles, snippets, and metadata in English and Russian</span></div>';
+  document.getElementById('search-results').innerHTML = '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,966 segments<br><span style="font-size:0.8rem;opacity:0.7">Searches titles, snippets, and metadata in English and Russian</span></div>';
 }
 
 async function loadYear(y) {
@@ -961,7 +1015,7 @@ async function doSearch() {
   const cnt = document.getElementById('result-count');
 
   if (q.length < 2) {
-    out.innerHTML = q.length === 0 ? '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,944 articles</div>' : '';
+    out.innerHTML = q.length === 0 ? '<div class="empty-state"><div class="big">🔍</div>Type at least 2 characters to search 144,966 segments</div>' : '';
     cnt.textContent = '';
     return;
   }

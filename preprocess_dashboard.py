@@ -65,8 +65,8 @@ COUNTRY_DISPLAY = [
 
 
 def load_data() -> pd.DataFrame:
-    """Load translated CSV."""
-    path = BASE / "1tv_news_2000_2026_translated.csv"
+    """Load classified CSV (with predicted categories)."""
+    path = BASE / "1tv_news_classified.csv"
     df = pd.read_csv(path, low_memory=False)
     df["date"] = pd.to_datetime(df["date_extracted"], errors="coerce")
     df["year"] = df["date"].dt.year
@@ -190,7 +190,7 @@ def search_shards(df: pd.DataFrame) -> None:
                 continue
             content_en = str(r.get("content_en", "")) if pd.notna(r.get("content_en")) else ""
             content_ru = str(r.get("content", "")) if pd.notna(r.get("content")) else ""
-            cat = str(r.get("category", "")) if pd.notna(r.get("category")) else ""
+            cat = str(r.get("category_label", "")) if pd.notna(r.get("category_label")) else ""
             wc = len(content_en.split()) if content_en else 0
             rec = {
                 "t": title_en[:150],
@@ -226,6 +226,12 @@ def summary_stats(df: pd.DataFrame) -> None:
             df["content_en"].astype(str).str.split().str.len().sum() / 1_000_000, 1
         ),
     }
+    # Category distribution
+    if "category_clean" in df.columns:
+        cats = df["category_clean"].value_counts()
+        stats["categories"] = [
+            {"name": str(c), "count": int(n)} for c, n in cats.items()
+        ]
     (DATA_DIR / "summary.json").write_text(json.dumps(stats))
     print(f"  summary.json: {stats}")
 
