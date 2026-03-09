@@ -4,572 +4,915 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>1TV Russian News Archive — 2000–2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 :root {
-  --blue: #006DAE;
-  --dark: #1a1a1a;
-  --gray: #666;
-  --light: #f5f5f5;
+  --bg-primary: #fafafa;
+  --bg-secondary: #f0f0f0;
+  --bg-card: rgba(255,255,255,0.55);
+  --bg-card-hover: rgba(255,255,255,0.75);
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6a6a6a;
+  --accent: #0066cc;
+  --accent-hover: #0052a3;
+  --green: #2A7347;
+  --green-light: #4A9B67;
+  --green-subtle: rgba(74,155,103,0.1);
   --border: #e0e0e0;
+  --border-light: #eaeaea;
+  --shadow: rgba(0,0,0,0.06);
+  --font-mono: 'IBM Plex Mono','SF Mono',monospace;
+  --font-sans: 'Space Grotesk',system-ui,sans-serif;
+  --max-width: 1200px;
+  --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+  --radius: 12px;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+
 body {
-  font-family: 'Georgia', 'Times New Roman', serif;
-  color: var(--dark);
-  background: #fff;
-  line-height: 1.6;
-  max-width: 1100px;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  overflow-x: hidden;
+}
+
+/* Animated mesh gradient background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 15%, rgba(0,102,204,0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(220,38,38,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 70% at 55% 85%, rgba(0,102,204,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 30% 55%, rgba(220,38,38,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 80% 45%, rgba(74,155,103,0.08) 0%, transparent 55%),
+    linear-gradient(135deg, #f8fafb 0%, #eaeef6 25%, #f6eaea 50%, #eaf2f0 75%, #f8fafb 100%);
+  background-size: 200% 200%;
+  animation: meshGradient 25s ease infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle 700px at 15% 75%, rgba(220,38,38,0.06) 0%, transparent 65%),
+    radial-gradient(circle 600px at 80% 25%, rgba(0,102,204,0.08) 0%, transparent 65%);
+  background-size: 150% 150%;
+  animation: meshGradient2 30s ease infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+@keyframes meshGradient {
+  0%,100% { background-position: 0% 0%; }
+  25% { background-position: 40% 20%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 20% 80%; }
+}
+@keyframes meshGradient2 {
+  0%,100% { background-position: 100% 0%; }
+  33% { background-position: 0% 60%; }
+  66% { background-position: 60% 100%; }
+}
+body > * { position: relative; z-index: 1; }
+
+a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+a:hover { color: var(--green); }
+
+/* Reading progress */
+#progress {
+  position: fixed; top: 0; left: 0;
+  height: 3px; width: 0%;
+  background: linear-gradient(90deg, var(--accent), #DC2626);
+  z-index: 9999;
+  transition: width 0.1s ease;
+}
+
+/* NAV */
+.nav {
+  position: sticky; top: 0;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+  box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+  z-index: 1000;
+}
+.nav-inner {
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 24px;
-}
-h1 { font-size: 2rem; font-weight: 400; margin-bottom: 0.3em; }
-h2 {
-  font-size: 1.3rem;
-  font-weight: 400;
-  color: var(--dark);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  margin: 3rem 0 1rem;
-}
-h3 { font-size: 1rem; font-weight: 400; color: var(--gray); margin-bottom: 0.5em; }
-p, li { font-size: 0.95rem; color: var(--gray); }
-a { color: var(--blue); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* Hero */
-.hero {
-  padding: 3rem 0 1.5rem;
-  border-bottom: 2px solid var(--dark);
-}
-.hero p.subtitle { font-size: 1.05rem; color: var(--gray); margin-top: 0.3em; }
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-.stat-card {
-  text-align: center;
-  padding: 1rem 0.5rem;
-  border: 1px solid var(--border);
-}
-.stat-card .number {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: var(--blue);
-  display: block;
-}
-.stat-card .label {
-  font-size: 0.8rem;
-  color: var(--gray);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Charts */
-.chart-container {
-  position: relative;
-  margin: 1rem 0 2rem;
-  max-height: 400px;
-}
-.chart-container canvas { max-height: 380px; }
-
-/* Controls */
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 1rem;
-}
-.controls button {
-  font-family: inherit;
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--gray);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.controls button:hover { border-color: var(--blue); color: var(--blue); }
-.controls button.active {
-  background: var(--blue);
-  color: #fff;
-  border-color: var(--blue);
-}
-
-/* Search */
-.search-box {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 1rem;
-}
-.search-box input, .search-box select {
-  font-family: inherit;
-  font-size: 0.9rem;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  outline: none;
-}
-.search-box input { flex: 1; }
-.search-box input:focus { border-color: var(--blue); }
-.search-box select { width: 100px; }
-#search-results {
-  max-height: 500px;
-  overflow-y: auto;
-}
-.result-item {
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-.result-item .date { font-size: 0.8rem; color: var(--gray); margin-right: 8px; }
-.result-item .title { font-size: 0.9rem; }
-.result-count { font-size: 0.85rem; color: var(--gray); margin-bottom: 0.5rem; }
-
-/* Top words */
-.words-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 2rem;
-}
-.word-bar {
+  padding: 0 1.5rem;
   display: flex;
   align-items: center;
-  margin-bottom: 3px;
-  font-size: 0.85rem;
+  justify-content: space-between;
+  height: 56px;
 }
-.word-bar .word { width: 100px; text-align: right; padding-right: 8px; color: var(--gray); }
-.word-bar .bar {
-  height: 16px;
-  background: var(--blue);
-  opacity: 0.7;
-  transition: width 0.3s;
+.nav-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
-.word-bar .count { font-size: 0.75rem; color: var(--gray); padding-left: 4px; }
+.nav-brand span { color: #DC2626; }
+.nav-right { display: flex; align-items: center; gap: 0.5rem; }
+.theme-toggle {
+  background: none; border: 1px solid var(--border);
+  padding: 0.35rem 0.7rem;
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 6px; cursor: pointer;
+  transition: all 0.15s;
+}
+.theme-toggle:hover {
+  border-color: var(--accent); color: var(--accent);
+}
 
-/* Year selector */
-.year-selector {
+/* TABS */
+.tabs {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 2px solid var(--border-light);
+  overflow-x: auto;
+}
+.tab {
+  background: none; border: none;
+  font-family: var(--font-sans); font-size: 0.88rem; font-weight: 500;
+  color: var(--text-muted);
+  padding: 0.75rem 1.2rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+
+/* MAIN */
+main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+.tab-content { display: none; animation: fadeIn 0.4s ease; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* HERO */
+.hero-section { margin-bottom: 2rem; }
+.hero-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.75rem;
+  animation: fadeIn 0.6s ease;
+}
+.hero-title .ru { color: #DC2626; }
+.hero-sub {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin-bottom: 2rem;
+  animation: fadeIn 0.8s ease;
+}
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.stat-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  text-align: center;
+  box-shadow: 0 2px 12px var(--shadow);
+  transition: all var(--transition);
+}
+.stat-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(0,102,204,0.2);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.stat-number {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  line-height: 1.1;
+}
+.stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0.3rem;
+}
+
+/* GLASS CARD */
+.glass {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 12px var(--shadow);
+  transition: all var(--transition);
+}
+.glass:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(74,155,103,0.2);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+}
+.glass h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+.glass h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 40px; height: 2px;
+  background: var(--accent);
+}
+.glass .note {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
   margin-bottom: 1rem;
 }
-.year-selector button {
-  font-family: inherit;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-  cursor: pointer;
+.chart-wrap { position: relative; max-height: 420px; }
+.chart-wrap canvas { max-height: 400px; }
+
+/* TOGGLE BUTTONS */
+.btn-group {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem;
 }
-.year-selector button.active {
-  background: var(--blue);
-  color: #fff;
-  border-color: var(--blue);
+.btn-group button {
+  font-family: var(--font-sans); font-size: 0.78rem;
+  padding: 5px 14px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.4);
+  color: var(--text-muted);
+  border-radius: 20px; cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(6px);
+}
+.btn-group button:hover { border-color: var(--accent); color: var(--accent); }
+.btn-group button.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
 }
 
-/* Footer */
+/* TOP WORDS */
+.words-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 2rem;
+}
+.word-bar {
+  display: flex; align-items: center; margin-bottom: 4px; font-size: 0.85rem;
+}
+.word-bar .w { width: 90px; text-align: right; padding-right: 10px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem; }
+.word-bar .b { height: 18px; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 2px; opacity: 0.7; transition: width 0.4s ease; }
+.word-bar .c { font-size: 0.72rem; color: var(--text-muted); padding-left: 6px; font-family: var(--font-mono); }
+
+.year-btns {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.year-btns button {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  padding: 3px 10px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.4);
+  color: var(--text-muted);
+  border-radius: 4px; cursor: pointer;
+  transition: all 0.15s;
+}
+.year-btns button.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+
+/* SEARCH */
+.search-wrap { margin-bottom: 1rem; }
+.search-row {
+  display: flex; gap: 8px; margin-bottom: 0.75rem;
+}
+.search-row input {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-sans); font-size: 0.95rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  transition: all 0.15s;
+  outline: none;
+}
+.search-row input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0,102,204,0.1);
+}
+.search-row select {
+  padding: 0.7rem 1rem;
+  font-family: var(--font-mono); font-size: 0.85rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.6);
+  cursor: pointer;
+  outline: none;
+}
+.search-meta {
+  font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  display: flex; gap: 1rem; align-items: center;
+}
+.search-lang-btns { display: flex; gap: 4px; }
+.search-lang-btns button {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  padding: 2px 10px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); border-radius: 4px;
+  cursor: pointer; transition: all 0.15s;
+}
+.search-lang-btns button.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+#search-results { max-height: 600px; overflow-y: auto; }
+.result-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+  display: flex; flex-direction: column; gap: 2px;
+  animation: fadeIn 0.2s ease;
+}
+.result-item .en-title { font-size: 0.92rem; color: var(--text-primary); }
+.result-item .ru-title { font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+.result-item .meta {
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);
+}
+.result-item .meta a { color: var(--accent); }
+.result-item strong { color: var(--accent); font-weight: 600; }
+
+/* FOOTER */
 footer {
-  margin-top: 4rem;
-  padding: 2rem 0;
-  border-top: 1px solid var(--border);
-  font-size: 0.8rem;
-  color: var(--gray);
+  max-width: var(--max-width);
+  margin: 3rem auto 0;
+  padding: 2rem 1.5rem;
+  border-top: 1px solid var(--border-light);
   text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
-.note {
-  font-size: 0.8rem;
-  color: var(--gray);
-  font-style: italic;
-  margin-top: 0.5rem;
+footer a { color: var(--accent); }
+
+/* BACK TO TOP */
+#btt {
+  position: fixed; bottom: 2rem; right: 2rem;
+  width: 44px; height: 44px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,102,204,0.3);
+  opacity: 0; pointer-events: none;
+  transform: translateY(20px);
+  transition: all var(--transition);
+  z-index: 999;
+  display: flex; align-items: center; justify-content: center;
 }
+#btt.visible { opacity: 1; pointer-events: all; transform: translateY(0); }
+#btt:hover { background: var(--green); transform: translateY(-3px); box-shadow: 0 6px 20px rgba(42,115,71,0.4); }
+
+/* DARK MODE */
+body.dark {
+  --bg-primary: #0f1419;
+  --bg-secondary: #161b22;
+  --bg-card: rgba(22,27,34,0.6);
+  --bg-card-hover: rgba(22,27,34,0.8);
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --green: #56d364;
+  --green-light: #56d364;
+  --border: #30363d;
+  --border-light: #21262d;
+  --shadow: rgba(0,0,0,0.3);
+}
+body.dark::before {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 15%, rgba(0,102,204,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(220,38,38,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 70% at 55% 85%, rgba(0,102,204,0.07) 0%, transparent 60%),
+    linear-gradient(135deg, #0d1117 0%, #0f1a24 25%, #1a0d0d 50%, #0d1a16 75%, #0d1117 100%);
+  background-size: 200% 200%;
+}
+body.dark::after {
+  background:
+    radial-gradient(circle 700px at 15% 75%, rgba(220,38,38,0.05) 0%, transparent 65%),
+    radial-gradient(circle 600px at 80% 25%, rgba(0,102,204,0.06) 0%, transparent 65%);
+  background-size: 150% 150%;
+}
+body.dark .nav {
+  background: rgba(15,20,25,0.80);
+  border-bottom-color: rgba(48,54,61,0.4);
+}
+body.dark .search-row input,
+body.dark .search-row select {
+  background: rgba(22,27,34,0.6);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+body.dark .btn-group button {
+  background: rgba(22,27,34,0.4);
+  border-color: var(--border);
+}
+body.dark .year-btns button {
+  background: rgba(22,27,34,0.4);
+  border-color: var(--border);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .words-grid { grid-template-columns: 1fr; }
+  .search-row { flex-direction: column; }
+  .nav-brand { font-size: 0.95rem; }
+  .hero-title { font-size: 1.6rem; }
+  footer { font-size: 0.75rem; }
+}
+@media (max-width: 480px) {
+  .tabs { gap: 0; }
+  .tab { padding: 0.6rem 0.8rem; font-size: 0.78rem; }
+}
+
+::selection { background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
 
-<!-- HERO -->
-<section class="hero">
-  <h1>1TV Russian News Archive</h1>
-  <p class="subtitle">144,966 articles from Russia's Channel One, machine-translated to English. January 2000 – March 2026.</p>
-  <div class="stats-grid" id="stats-grid"></div>
-</section>
+<div id="progress"></div>
 
-<!-- VOLUME OVER TIME -->
-<h2>Article Volume Over Time</h2>
-<p>Monthly article count from 1tv.ru news archive.</p>
-<div class="chart-container"><canvas id="volumeChart"></canvas></div>
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand">1TV <span>Новости</span> Archive</div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="theme-btn" title="Toggle dark mode">◑</button>
+    </div>
+  </div>
+</nav>
 
-<!-- YEARLY STATS -->
-<h2>Average Article Length by Year</h2>
-<p>Average character count of English-translated content per year.</p>
-<div class="chart-container"><canvas id="lengthChart"></canvas></div>
-
-<!-- KEYWORD TRACKER -->
-<h2>Keyword Tracker</h2>
-<p>Percentage of articles mentioning selected keywords each month. Click to toggle.</p>
-<div class="controls" id="keyword-controls"></div>
-<div class="chart-container"><canvas id="keywordChart"></canvas></div>
-
-<!-- COUNTRY MENTIONS -->
-<h2>Country Mentions</h2>
-<p>Percentage of articles mentioning selected countries each month.</p>
-<div class="controls" id="country-controls"></div>
-<div class="chart-container"><canvas id="countryChart"></canvas></div>
-
-<!-- TOP WORDS -->
-<h2>Top Words by Year</h2>
-<p>Most frequent words in article titles and content (excluding stopwords).</p>
-<div class="year-selector" id="year-selector"></div>
-<div class="words-grid" id="words-grid"></div>
-
-<!-- SEARCH -->
-<h2>Article Search</h2>
-<p>Search across 144,944 English-translated article titles.</p>
-<div class="search-box">
-  <input type="text" id="search-input" placeholder="Search titles (e.g. Ukraine, sanctions, Putin)...">
-  <select id="search-year">
-    <option value="all">All years</option>
-  </select>
+<div class="tabs" role="tablist">
+  <button class="tab active" data-tab="overview" role="tab">Overview</button>
+  <button class="tab" data-tab="volume" role="tab">Volume</button>
+  <button class="tab" data-tab="keywords" role="tab">Keywords</button>
+  <button class="tab" data-tab="countries" role="tab">Countries</button>
+  <button class="tab" data-tab="words" role="tab">Top Words</button>
+  <button class="tab" data-tab="search" role="tab">Search</button>
 </div>
-<div class="result-count" id="result-count"></div>
-<div id="search-results"></div>
+
+<main>
+  <!-- OVERVIEW -->
+  <section id="tab-overview" class="tab-content active">
+    <div class="hero-section">
+      <h1 class="hero-title">Channel One <span class="ru">Первый канал</span><br>Russian News Archive</h1>
+      <p class="hero-sub">144,966 news articles from Russia's largest state broadcaster, scraped from the 1TV API and machine-translated from Russian to English. Full bilingual search across 26 years of coverage.</p>
+    </div>
+    <div class="stat-cards" id="stat-cards"></div>
+
+    <div class="glass">
+      <h2>Monthly Article Volume</h2>
+      <p class="note">Articles published per month, 2000–2026</p>
+      <div class="chart-wrap"><canvas id="overviewVolume"></canvas></div>
+    </div>
+
+    <div class="glass">
+      <h2>Average Article Length by Year</h2>
+      <p class="note">Mean character count of English-translated content</p>
+      <div class="chart-wrap"><canvas id="overviewLength"></canvas></div>
+    </div>
+  </section>
+
+  <!-- VOLUME -->
+  <section id="tab-volume" class="tab-content">
+    <div class="glass">
+      <h2>Article Volume Over Time</h2>
+      <p class="note">Monthly count of articles scraped from 1tv.ru</p>
+      <div class="chart-wrap"><canvas id="volumeChart"></canvas></div>
+    </div>
+    <div class="glass">
+      <h2>Yearly Breakdown</h2>
+      <p class="note">Total articles and average content length per year</p>
+      <div class="chart-wrap"><canvas id="yearlyChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- KEYWORDS -->
+  <section id="tab-keywords" class="tab-content">
+    <div class="glass">
+      <h2>Keyword Tracker</h2>
+      <p class="note">Percentage of articles mentioning each keyword per month. Click keywords to toggle.</p>
+      <div class="btn-group" id="kw-btns"></div>
+      <div class="chart-wrap"><canvas id="kwChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- COUNTRIES -->
+  <section id="tab-countries" class="tab-content">
+    <div class="glass">
+      <h2>Country Mentions</h2>
+      <p class="note">Percentage of articles mentioning each country per month. Click to toggle.</p>
+      <div class="btn-group" id="co-btns"></div>
+      <div class="chart-wrap"><canvas id="coChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- TOP WORDS -->
+  <section id="tab-words" class="tab-content">
+    <div class="glass">
+      <h2>Top Words by Year</h2>
+      <p class="note">Most frequent English words in titles and content (stopwords removed)</p>
+      <div class="year-btns" id="year-btns"></div>
+      <div class="words-grid" id="words-grid"></div>
+    </div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="tab-search" class="tab-content">
+    <div class="glass">
+      <h2>Article Search</h2>
+      <p class="note">Search 144,944 articles in English or Russian. Year shards load on demand.</p>
+      <div class="search-wrap">
+        <div class="search-row">
+          <input type="text" id="q" placeholder="Search titles — e.g. Ukraine, Путин, sanctions...">
+          <select id="qy"><option value="all">All years</option></select>
+        </div>
+        <div class="search-meta">
+          <span id="result-count"></span>
+          <div class="search-lang-btns">
+            <button class="active" data-lang="both">EN + RU</button>
+            <button data-lang="en">English</button>
+            <button data-lang="ru">Русский</button>
+          </div>
+        </div>
+      </div>
+      <div id="search-results"></div>
+    </div>
+  </section>
+</main>
 
 <footer>
-  <p>Data scraped from <a href="https://www.1tv.ru">1tv.ru</a> via the Channel One API. Machine-translated from Russian using <a href="https://github.com/argosopentech/argos-translate">Argos Translate</a> (offline, open-source NMT).</p>
-  <p style="margin-top:0.5rem;">Charles Crabtree, Senior Lecturer, School of Social Sciences, Monash University</p>
+  <p>Data from <a href="https://www.1tv.ru" target="_blank">1tv.ru</a> via Channel One API. Translated with <a href="https://github.com/argosopentech/argos-translate" target="_blank">Argos Translate</a> (offline NMT).</p>
+  <p style="margin-top:0.5rem;">Charles Crabtree · Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
+  <p style="margin-top:0.5rem;"><a href="https://github.com/lobsterbush/kremlin-speeches" target="_blank">GitHub Repository</a></p>
 </footer>
 
+<button id="btt" title="Back to top">↑</button>
+
 <script>
-const COLORS = [
-  '#006DAE','#E63946','#2A9D8F','#E9C46A','#264653',
-  '#F4A261','#A8DADC','#457B9D','#D62828','#023E8A',
-  '#9B2226','#AE2012','#BB3E03','#CA6702','#EE9B00','#94D2BD'
+/* CONSTANTS */
+const PALETTE = [
+  '#0066cc','#DC2626','#2A9D8F','#E9C46A','#264653',
+  '#F4A261','#7C3AED','#457B9D','#D62828','#023E8A',
+  '#9B2226','#059669','#BB3E03','#CA6702','#EE9B00','#94D2BD'
 ];
+const FONT = { family: 'Space Grotesk', size: 11 };
+const GRID_COLOR = () => getComputedStyle(document.body).getPropertyValue('--border-light').trim() || '#eaeaea';
 
-// Fetch helper
-async function fetchJSON(path) {
-  const r = await fetch(path);
-  return r.json();
+async function F(p) { return (await fetch(p)).json(); }
+
+/* TABS */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'volume' && !window._volInit) initVolumeTab();
+    if (t.dataset.tab === 'keywords' && !window._kwInit) initKeywords();
+    if (t.dataset.tab === 'countries' && !window._coInit) initCountries();
+    if (t.dataset.tab === 'words' && !window._wdInit) initWords();
+    if (t.dataset.tab === 'search' && !window._srInit) initSearch();
+  });
+});
+
+/* DARK MODE */
+const themeBtn = document.getElementById('theme-btn');
+if (localStorage.getItem('dark') === '1') document.body.classList.add('dark');
+themeBtn.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  localStorage.setItem('dark', document.body.classList.contains('dark') ? '1' : '0');
+});
+
+/* PROGRESS + BACK TO TOP */
+window.addEventListener('scroll', () => {
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  document.getElementById('progress').style.width = h > 0 ? (window.scrollY / h * 100) + '%' : '0%';
+  const btt = document.getElementById('btt');
+  if (window.scrollY > 400) btt.classList.add('visible');
+  else btt.classList.remove('visible');
+});
+document.getElementById('btt').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+/* CHART DEFAULTS */
+function lineOpts(yLabel) {
+  return {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+      y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT },
+        title: { display: true, text: yLabel, font: { ...FONT, size: 12 } } }
+    }
+  };
 }
 
-// --- HERO ---
-async function initHero() {
-  const s = await fetchJSON('data/summary.json');
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card"><span class="number">${s.total_articles.toLocaleString()}</span><span class="label">Articles</span></div>
-    <div class="stat-card"><span class="number">${s.years_covered}</span><span class="label">Years</span></div>
-    <div class="stat-card"><span class="number">${s.avg_articles_per_day}</span><span class="label">Articles/Day</span></div>
-    <div class="stat-card"><span class="number">${s.total_words_millions}M</span><span class="label">Words</span></div>
-    <div class="stat-card"><span class="number">${s.date_start.slice(0,4)}–${s.date_end.slice(0,4)}</span><span class="label">Date Range</span></div>
-  `;
+/* OVERVIEW TAB */
+async function initOverview() {
+  const [summary, monthly, yearly] = await Promise.all([
+    F('data/summary.json'), F('data/monthly_volume.json'), F('data/yearly_stats.json')
+  ]);
+
+  document.getElementById('stat-cards').innerHTML = [
+    { n: summary.total_articles.toLocaleString(), l: 'Articles' },
+    { n: summary.years_covered, l: 'Years' },
+    { n: summary.avg_articles_per_day, l: 'Articles/Day' },
+    { n: summary.total_words_millions + 'M', l: 'Words' },
+    { n: summary.date_start.slice(0,4) + '–' + summary.date_end.slice(0,4), l: 'Date Range' },
+  ].map(s => `<div class="stat-card"><span class="stat-number">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
+
+  new Chart(document.getElementById('overviewVolume'), {
+    type: 'line',
+    data: { labels: monthly.map(d=>d.month), datasets: [{
+      data: monthly.map(d=>d.count),
+      borderColor: '#0066cc', backgroundColor: 'rgba(0,102,204,0.06)',
+      fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+    }]},
+    options: lineOpts('Articles per month'),
+  });
+
+  new Chart(document.getElementById('overviewLength'), {
+    type: 'bar',
+    data: { labels: yearly.map(d=>d.year), datasets: [{
+      data: yearly.map(d=>d.avg_content_len),
+      backgroundColor: 'rgba(0,102,204,0.5)', borderColor: '#0066cc', borderWidth: 1,
+      borderRadius: 3,
+    }]},
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: FONT } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT },
+          title: { display: true, text: 'Avg. characters', font: { ...FONT, size: 12 } } }
+      }
+    }
+  });
 }
 
-// --- VOLUME ---
-async function initVolume() {
-  const data = await fetchJSON('data/monthly_volume.json');
+/* VOLUME TAB */
+async function initVolumeTab() {
+  window._volInit = true;
+  const [monthly, yearly] = await Promise.all([F('data/monthly_volume.json'), F('data/yearly_stats.json')]);
+
   new Chart(document.getElementById('volumeChart'), {
     type: 'line',
-    data: {
-      labels: data.map(d => d.month),
-      datasets: [{
-        data: data.map(d => d.count),
-        borderColor: '#006DAE',
-        backgroundColor: 'rgba(0,109,174,0.08)',
-        fill: true,
-        borderWidth: 1.5,
-        pointRadius: 0,
-        tension: 0.3,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: { maxTicksLimit: 12, font: { size: 11 } },
-          grid: { display: false },
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f0f0f0' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: 'Articles per month', font: { size: 12, family: 'Georgia' } }
-        }
-      }
-    }
+    data: { labels: monthly.map(d=>d.month), datasets: [{
+      data: monthly.map(d=>d.count),
+      borderColor: '#0066cc', backgroundColor: 'rgba(0,102,204,0.06)',
+      fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+    }]},
+    options: lineOpts('Articles per month'),
   });
-}
 
-// --- LENGTH ---
-async function initLength() {
-  const data = await fetchJSON('data/yearly_stats.json');
-  new Chart(document.getElementById('lengthChart'), {
+  new Chart(document.getElementById('yearlyChart'), {
     type: 'bar',
-    data: {
-      labels: data.map(d => d.year),
-      datasets: [{
-        data: data.map(d => d.avg_content_len),
-        backgroundColor: 'rgba(0,109,174,0.6)',
-        borderColor: '#006DAE',
-        borderWidth: 1,
-      }]
-    },
+    data: { labels: yearly.map(d=>d.year), datasets: [{
+      label: 'Articles',
+      data: yearly.map(d=>d.count),
+      backgroundColor: 'rgba(220,38,38,0.5)',
+      borderColor: '#DC2626', borderWidth: 1, borderRadius: 3,
+    }]},
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f0f0f0' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: 'Avg. characters (English)', font: { size: 12, family: 'Georgia' } }
-        }
+        x: { grid: { display: false }, ticks: { font: FONT } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT },
+          title: { display: true, text: 'Total articles', font: { ...FONT, size: 12 } } }
       }
     }
   });
 }
 
-// --- KEYWORDS ---
-let keywordData = null;
-let keywordChart = null;
-const activeKeywords = new Set(['ukraine', 'military', 'china']);
+/* KEYWORDS */
+let kwData = null, kwChart = null;
+const activeKW = new Set(['ukraine','military','china']);
 
 async function initKeywords() {
-  keywordData = await fetchJSON('data/keyword_trends.json');
-  const container = document.getElementById('keyword-controls');
-  Object.keys(keywordData).forEach((kw, i) => {
-    const btn = document.createElement('button');
-    btn.textContent = kw;
-    btn.dataset.kw = kw;
-    if (activeKeywords.has(kw)) btn.classList.add('active');
-    btn.onclick = () => toggleKeyword(kw, btn);
-    container.appendChild(btn);
+  window._kwInit = true;
+  kwData = await F('data/keyword_trends.json');
+  const box = document.getElementById('kw-btns');
+  Object.keys(kwData).forEach(kw => {
+    const b = document.createElement('button');
+    b.textContent = kw;
+    if (activeKW.has(kw)) b.classList.add('active');
+    b.onclick = () => { activeKW.has(kw) ? activeKW.delete(kw) : activeKW.add(kw); b.classList.toggle('active'); drawKW(); };
+    box.appendChild(b);
   });
-  renderKeywordChart();
+  drawKW();
 }
 
-function toggleKeyword(kw, btn) {
-  if (activeKeywords.has(kw)) { activeKeywords.delete(kw); btn.classList.remove('active'); }
-  else { activeKeywords.add(kw); btn.classList.add('active'); }
-  renderKeywordChart();
-}
-
-function renderKeywordChart() {
-  const months = keywordData[Object.keys(keywordData)[0]].map(d => d.month);
-  const datasets = [];
-  let ci = 0;
-  activeKeywords.forEach(kw => {
-    if (!keywordData[kw]) return;
-    datasets.push({
-      label: kw,
-      data: keywordData[kw].map(d => d.pct),
-      borderColor: COLORS[ci % COLORS.length],
-      borderWidth: 1.5,
-      pointRadius: 0,
-      tension: 0.3,
-      fill: false,
-    });
+function drawKW() {
+  const labels = kwData[Object.keys(kwData)[0]].map(d=>d.month);
+  const ds = []; let ci = 0;
+  activeKW.forEach(kw => {
+    if (!kwData[kw]) return;
+    ds.push({ label: kw, data: kwData[kw].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
     ci++;
   });
-  if (keywordChart) keywordChart.destroy();
-  keywordChart = new Chart(document.getElementById('keywordChart'), {
-    type: 'line',
-    data: { labels: months, datasets },
+  if (kwChart) kwChart.destroy();
+  kwChart = new Chart(document.getElementById('kwChart'), {
+    type: 'line', data: { labels, datasets: ds },
     options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'top', labels: { font: { size: 11, family: 'Georgia' }, boxWidth: 12 } } },
+      ...lineOpts('% of articles'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
       scales: {
-        x: { ticks: { maxTicksLimit: 12, font: { size: 11 } }, grid: { display: false } },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f0f0f0' },
-          ticks: { font: { size: 11 }, callback: v => v + '%' },
-          title: { display: true, text: '% of articles', font: { size: 12, family: 'Georgia' } }
-        }
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of articles', font: { ...FONT, size: 12 } } }
       }
     }
   });
 }
 
-// --- COUNTRIES ---
-let countryData = null;
-let countryChart = null;
-const activeCountries = new Set(['ukraine', 'china', 'united states', 'syria']);
+/* COUNTRIES */
+let coData = null, coChart = null;
+const activeCO = new Set(['ukraine','china','united states','syria']);
 
 async function initCountries() {
-  countryData = await fetchJSON('data/country_mentions.json');
-  const container = document.getElementById('country-controls');
-  Object.keys(countryData).forEach((c, i) => {
-    const btn = document.createElement('button');
-    btn.textContent = c;
-    btn.dataset.country = c;
-    if (activeCountries.has(c)) btn.classList.add('active');
-    btn.onclick = () => toggleCountry(c, btn);
-    container.appendChild(btn);
+  window._coInit = true;
+  coData = await F('data/country_mentions.json');
+  const box = document.getElementById('co-btns');
+  Object.keys(coData).forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = c;
+    if (activeCO.has(c)) b.classList.add('active');
+    b.onclick = () => { activeCO.has(c) ? activeCO.delete(c) : activeCO.add(c); b.classList.toggle('active'); drawCO(); };
+    box.appendChild(b);
   });
-  renderCountryChart();
+  drawCO();
 }
 
-function toggleCountry(c, btn) {
-  if (activeCountries.has(c)) { activeCountries.delete(c); btn.classList.remove('active'); }
-  else { activeCountries.add(c); btn.classList.add('active'); }
-  renderCountryChart();
-}
-
-function renderCountryChart() {
-  const months = countryData[Object.keys(countryData)[0]].map(d => d.month);
-  const datasets = [];
-  let ci = 0;
-  activeCountries.forEach(c => {
-    if (!countryData[c]) return;
-    datasets.push({
-      label: c,
-      data: countryData[c].map(d => d.pct),
-      borderColor: COLORS[ci % COLORS.length],
-      borderWidth: 1.5,
-      pointRadius: 0,
-      tension: 0.3,
-      fill: false,
-    });
+function drawCO() {
+  const labels = coData[Object.keys(coData)[0]].map(d=>d.month);
+  const ds = []; let ci = 0;
+  activeCO.forEach(c => {
+    if (!coData[c]) return;
+    ds.push({ label: c, data: coData[c].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
     ci++;
   });
-  if (countryChart) countryChart.destroy();
-  countryChart = new Chart(document.getElementById('countryChart'), {
-    type: 'line',
-    data: { labels: months, datasets },
+  if (coChart) coChart.destroy();
+  coChart = new Chart(document.getElementById('coChart'), {
+    type: 'line', data: { labels, datasets: ds },
     options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'top', labels: { font: { size: 11, family: 'Georgia' }, boxWidth: 12 } } },
+      ...lineOpts('% of articles'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
       scales: {
-        x: { ticks: { maxTicksLimit: 12, font: { size: 11 } }, grid: { display: false } },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f0f0f0' },
-          ticks: { font: { size: 11 }, callback: v => v + '%' },
-          title: { display: true, text: '% of articles', font: { size: 12, family: 'Georgia' } }
-        }
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of articles', font: { ...FONT, size: 12 } } }
       }
     }
   });
 }
 
-// --- TOP WORDS ---
-let topWordsData = null;
-let selectedYear = '2022';
+/* TOP WORDS */
+let twData = null, selYear = '2022';
 
-async function initTopWords() {
-  topWordsData = await fetchJSON('data/top_words_by_year.json');
-  const container = document.getElementById('year-selector');
-  Object.keys(topWordsData).sort().forEach(y => {
-    const btn = document.createElement('button');
-    btn.textContent = y;
-    if (y === selectedYear) btn.classList.add('active');
-    btn.onclick = () => {
-      container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedYear = y;
-      renderTopWords();
+async function initWords() {
+  window._wdInit = true;
+  twData = await F('data/top_words_by_year.json');
+  const box = document.getElementById('year-btns');
+  Object.keys(twData).sort().forEach(y => {
+    const b = document.createElement('button');
+    b.textContent = y;
+    if (y === selYear) b.classList.add('active');
+    b.onclick = () => {
+      box.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      selYear = y; drawWords();
     };
-    container.appendChild(btn);
+    box.appendChild(b);
   });
-  renderTopWords();
+  drawWords();
 }
 
-function renderTopWords() {
-  const words = topWordsData[selectedYear] || [];
-  const maxCount = words.length > 0 ? words[0].count : 1;
-  const grid = document.getElementById('words-grid');
-  grid.innerHTML = words.map(w => {
-    const pct = (w.count / maxCount * 100).toFixed(0);
-    return `<div class="word-bar">
-      <span class="word">${w.word}</span>
-      <span class="bar" style="width:${pct}%"></span>
-      <span class="count">${w.count.toLocaleString()}</span>
+function drawWords() {
+  const words = twData[selYear] || [];
+  const max = words.length > 0 ? words[0].count : 1;
+  document.getElementById('words-grid').innerHTML = words.map(w => {
+    const pct = (w.count / max * 100).toFixed(0);
+    return `<div class="word-bar"><span class="w">${w.word}</span><span class="b" style="width:${pct}%"></span><span class="c">${w.count.toLocaleString()}</span></div>`;
+  }).join('');
+}
+
+/* SEARCH */
+const cache = {};
+let searchLang = 'both';
+
+async function initSearch() {
+  window._srInit = true;
+  const years = await F('data/search/years.json');
+  const sel = document.getElementById('qy');
+  years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
+
+  let timer = null;
+  const go = () => { clearTimeout(timer); timer = setTimeout(doSearch, 300); };
+  document.getElementById('q').addEventListener('input', go);
+  sel.addEventListener('change', go);
+
+  document.querySelectorAll('.search-lang-btns button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.search-lang-btns button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      searchLang = b.dataset.lang;
+      doSearch();
+    });
+  });
+}
+
+async function loadYear(y) {
+  if (cache[y]) return cache[y];
+  const d = await F(`data/search/${y}.json`);
+  cache[y] = d;
+  return d;
+}
+
+async function doSearch() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const yf = document.getElementById('qy').value;
+  const out = document.getElementById('search-results');
+  const cnt = document.getElementById('result-count');
+
+  if (q.length < 2) { out.innerHTML = ''; cnt.textContent = ''; return; }
+
+  let articles = [];
+  if (yf === 'all') {
+    const years = await F('data/search/years.json');
+    articles = (await Promise.all(years.map(loadYear))).flat();
+  } else {
+    articles = await loadYear(yf);
+  }
+
+  const matches = articles.filter(a => {
+    if (searchLang === 'en') return a.t.toLowerCase().includes(q);
+    if (searchLang === 'ru') return (a.r || '').toLowerCase().includes(q);
+    return a.t.toLowerCase().includes(q) || (a.r || '').toLowerCase().includes(q);
+  });
+
+  const shown = matches.slice(0, 100);
+  cnt.textContent = `${matches.length.toLocaleString()} results${matches.length > 100 ? ' (first 100 shown)' : ''}`;
+
+  out.innerHTML = shown.map(a => {
+    const enH = hl(a.t, q);
+    const ruH = a.r ? hl(a.r, q) : '';
+    return `<div class="result-item">
+      <span class="en-title">${enH}</span>
+      ${ruH ? `<span class="ru-title">${ruH}</span>` : ''}
+      <span class="meta">${a.d} · <a href="${a.u}" target="_blank">1tv.ru ↗</a></span>
     </div>`;
   }).join('');
 }
 
-// --- SEARCH ---
-const searchCache = {};
-
-async function loadSearchYear(year) {
-  if (searchCache[year]) return searchCache[year];
-  const data = await fetchJSON(`data/search/${year}.json`);
-  searchCache[year] = data;
-  return data;
+function hl(text, q) {
+  const i = text.toLowerCase().indexOf(q);
+  if (i === -1) return text;
+  return text.slice(0,i) + '<strong>' + text.slice(i, i+q.length) + '</strong>' + text.slice(i+q.length);
 }
 
-async function initSearch() {
-  const sel = document.getElementById('search-year');
-  const years = await fetchJSON('data/search/years.json');
-  years.forEach(y => {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    sel.appendChild(opt);
-  });
-
-  let debounce = null;
-  const input = document.getElementById('search-input');
-  const doSearch = () => { clearTimeout(debounce); debounce = setTimeout(runSearch, 300); };
-  input.addEventListener('input', doSearch);
-  sel.addEventListener('change', doSearch);
-}
-
-async function runSearch() {
-  const query = document.getElementById('search-input').value.trim().toLowerCase();
-  const yearFilter = document.getElementById('search-year').value;
-  const resultsDiv = document.getElementById('search-results');
-  const countDiv = document.getElementById('result-count');
-
-  if (query.length < 2) {
-    resultsDiv.innerHTML = '';
-    countDiv.textContent = '';
-    return;
-  }
-
-  let articles = [];
-  if (yearFilter === 'all') {
-    // Load all years progressively
-    const years = await fetchJSON('data/search/years.json');
-    const promises = years.map(y => loadSearchYear(y));
-    const allData = await Promise.all(promises);
-    articles = allData.flat();
-  } else {
-    articles = await loadSearchYear(yearFilter);
-  }
-
-  const matches = articles.filter(a => a.t.toLowerCase().includes(query));
-  const shown = matches.slice(0, 100);
-
-  countDiv.textContent = `${matches.length.toLocaleString()} results${matches.length > 100 ? ' (showing first 100)' : ''}`;
-  resultsDiv.innerHTML = shown.map(a =>
-    `<div class="result-item">
-      <span class="date">${a.d}</span>
-      <a class="title" href="${a.u}" target="_blank">${highlight(a.t, query)}</a>
-    </div>`
-  ).join('');
-}
-
-function highlight(text, query) {
-  const idx = text.toLowerCase().indexOf(query);
-  if (idx === -1) return text;
-  return text.slice(0, idx) + '<strong>' + text.slice(idx, idx + query.length) + '</strong>' + text.slice(idx + query.length);
-}
-
-// --- INIT ---
-(async () => {
-  await initHero();
-  await initVolume();
-  await initLength();
-  await initKeywords();
-  await initCountries();
-  await initTopWords();
-  await initSearch();
-})();
+/* INIT */
+initOverview();
 </script>
 </body>
 </html>
