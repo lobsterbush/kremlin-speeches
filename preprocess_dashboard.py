@@ -236,6 +236,114 @@ def summary_stats(df: pd.DataFrame) -> None:
     print(f"  summary.json: {stats}")
 
 
+# ── Kremlin speeches data generation ───────────────────────────────────────────
+
+def load_kremlin_speeches() -> pd.DataFrame:
+    """Load Kremlin presidential speeches CSV."""
+    import csv as _csv
+    import sys as _sys
+    _csv.field_size_limit(_sys.maxsize)
+
+    path = BASE / "kremlin_speeches_all_lemmatized.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, engine="python")
+    df["date"] = pd.to_datetime(df["date"], format="mixed", errors="coerce")
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = (
+        df["title"].fillna("").astype(str)
+        + " "
+        + df["content"].fillna("").astype(str)
+    ).str.lower()
+    return df
+
+
+def kremlin_stats(df: pd.DataFrame) -> None:
+    """Generate Kremlin speeches summary, volume, keywords, country data."""
+    kr_dir = DATA_DIR / "kremlin"
+    kr_dir.mkdir(parents=True, exist_ok=True)
+
+    # Summary
+    pres_counts = (
+        df["president"].value_counts()
+        .reset_index()
+        .rename(columns={"index": "president", "president": "name", "count": "count"})
+    )
+    top_locations = (
+        df["location"].dropna()
+        .value_counts()
+        .head(10)
+        .reset_index()
+        .rename(columns={"index": "location", "location": "name", "count": "count"})
+    )
+    stats = {
+        "total_speeches": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_words": round(df["total_words"].mean(), 0) if "total_words" in df.columns else 0,
+        "presidents": [
+            {"name": str(r.get("name", r.get("president", ""))),
+             "count": int(r["count"])}
+            for _, r in pres_counts.iterrows()
+        ],
+        "top_locations": [
+            {"name": str(r.get("name", r.get("location", ""))),
+             "count": int(r["count"])}
+            for _, r in top_locations.iterrows()
+        ],
+    }
+    (kr_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  kremlin/summary.json: {stats['total_speeches']} speeches")
+
+    # Monthly volume
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (kr_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  kremlin/monthly_volume.json: {len(data)} months")
+
+    # Keyword trends
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (kr_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  kremlin/keyword_trends.json: {len(kw_results)} keywords")
+
+    # Country mentions
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (kr_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  kremlin/country_mentions.json: {len(co_results)} countries")
+
+
 # ── TASS data generation ───────────────────────────────────────────────────────
 
 def load_tass() -> pd.DataFrame:
@@ -324,17 +432,27 @@ def tass_stats(df: pd.DataFrame) -> None:
     print(f"  tass/country_mentions.json: {len(co_results)} countries")
 
 
-def cross_source_comparison(otv_df: pd.DataFrame, tass_df: pd.DataFrame) -> None:
+def cross_source_comparison(
+    otv_df: pd.DataFrame,
+    tass_df: pd.DataFrame,
+    kremlin_df: pd.DataFrame = None,
+    mfa_df: pd.DataFrame = None,
+) -> None:
     """Generate cross-source keyword comparison data."""
     compare_dir = DATA_DIR / "compare"
     compare_dir.mkdir(parents=True, exist_ok=True)
 
-    # For each keyword, produce monthly pct for both sources
+    sources = [("1tv", otv_df), ("tass", tass_df)]
+    if kremlin_df is not None and len(kremlin_df) > 0:
+        sources.append(("kremlin", kremlin_df))
+    if mfa_df is not None and len(mfa_df) > 0:
+        sources.append(("mfa", mfa_df))
+
     results = {}
     for kw in TRACKED_KEYWORDS:
         pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
         entry = {}
-        for label, df in [("1tv", otv_df), ("tass", tass_df)]:
+        for label, df in sources:
             if len(df) == 0:
                 continue
             monthly = (
@@ -349,7 +467,84 @@ def cross_source_comparison(otv_df: pd.DataFrame, tass_df: pd.DataFrame) -> None
             ]
         results[kw] = entry
     (compare_dir / "keyword_comparison.json").write_text(json.dumps(results))
-    print(f"  compare/keyword_comparison.json: {len(results)} keywords")
+    print(f"  compare/keyword_comparison.json: {len(results)} keywords, {len(sources)} sources")
+
+
+# ── MFA Telegram data generation ──────────────────────────────────────────────
+
+def load_mfa() -> pd.DataFrame:
+    """Load MFA Telegram messages CSV if available."""
+    path = BASE / "mfa_telegram.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, low_memory=False)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = df["text"].fillna("").astype(str).str.lower()
+    return df
+
+
+def mfa_stats(df: pd.DataFrame) -> None:
+    """Generate MFA summary, volume, keywords, and country data."""
+    mfa_dir = DATA_DIR / "mfa"
+    mfa_dir.mkdir(parents=True, exist_ok=True)
+
+    stats = {
+        "total_messages": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_text_len": round(df["text"].str.len().mean(), 0),
+    }
+    (mfa_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  mfa/summary.json: {stats['total_messages']} messages")
+
+    # Monthly volume
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (mfa_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  mfa/monthly_volume.json: {len(data)} months")
+
+    # Keyword trends
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (mfa_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  mfa/keyword_trends.json: {len(kw_results)} keywords")
+
+    # Country mentions
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (mfa_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  mfa/country_mentions.json: {len(co_results)} countries")
 
 
 def main():
@@ -366,16 +561,35 @@ def main():
     top_words_by_year(df)
     search_shards(df)
 
+    print("\nLoading Kremlin speeches...")
+    kremlin_df = load_kremlin_speeches()
+    if len(kremlin_df) > 0:
+        print(f"Loaded {len(kremlin_df)} Kremlin speeches.\n")
+        print("Generating Kremlin JSON files:")
+        kremlin_stats(kremlin_df)
+    else:
+        print("No Kremlin speeches data found, skipping.\n")
+
     print("\nLoading TASS data...")
     tass_df = load_tass()
     if len(tass_df) > 0:
         print(f"Loaded {len(tass_df)} TASS rows.\n")
         print("Generating TASS JSON files:")
         tass_stats(tass_df)
-        print("\nGenerating cross-source comparison:")
-        cross_source_comparison(df, tass_df)
     else:
         print("No TASS data found, skipping.\n")
+
+    print("\nLoading MFA Telegram data...")
+    mfa_df = load_mfa()
+    if len(mfa_df) > 0:
+        print(f"Loaded {len(mfa_df)} MFA messages.\n")
+        print("Generating MFA JSON files:")
+        mfa_stats(mfa_df)
+    else:
+        print("No MFA data found, skipping.\n")
+
+    print("\nGenerating cross-source comparison:")
+    cross_source_comparison(df, tass_df, kremlin_df, mfa_df)
 
     print("\nDone!")
 

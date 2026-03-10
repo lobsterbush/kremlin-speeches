@@ -570,7 +570,9 @@ body.dark .year-btns button {
   <button class="tab" data-tab="keywords" role="tab">Keywords</button>
   <button class="tab" data-tab="countries" role="tab">Countries</button>
   <button class="tab" data-tab="words" role="tab">Top Words</button>
+  <button class="tab" data-tab="speeches" role="tab">Speeches</button>
   <button class="tab" data-tab="tass" role="tab">TASS</button>
+  <button class="tab" data-tab="mfa" role="tab">MFA</button>
   <button class="tab" data-tab="compare" role="tab">Compare</button>
   <button class="tab" data-tab="search" role="tab">Search</button>
 </div>
@@ -647,6 +649,31 @@ body.dark .year-btns button {
     </div>
   </section>
 
+  <!-- KREMLIN SPEECHES -->
+  <section id="tab-speeches" class="tab-content">
+    <div class="hero-section">
+      <h1 class="hero-title" style="font-size:clamp(1.4rem,3vw,2rem)">Kremlin Speeches <span class="ru">Кремль</span></h1>
+      <p class="hero-sub">1,402 prepared ceremonial remarks from en.kremlin.ru (2000–2025). These are transcripts of presidential addresses at scheduled events — award ceremonies, state visits, commemorations, and national holidays. They reveal <em>what Russia wants to celebrate</em>, not real-time crisis response.</p>
+    </div>
+    <div class="stat-cards" id="kr-stat-cards"></div>
+    <div class="glass">
+      <h2>Speech Volume Over Time</h2>
+      <p class="note">Speeches per month, 2000–2025</p>
+      <div class="chart-wrap"><canvas id="krVolume"></canvas></div>
+    </div>
+    <div class="glass">
+      <h2>By President</h2>
+      <p class="note">Speeches by presidential term</p>
+      <div class="chart-wrap" style="max-height:260px;"><canvas id="krPresidents"></canvas></div>
+    </div>
+    <div class="glass">
+      <h2>Keyword Tracker</h2>
+      <p class="note">Percentage of speeches mentioning each keyword per month</p>
+      <div class="btn-group" id="kr-kw-btns"></div>
+      <div class="chart-wrap"><canvas id="krKwChart"></canvas></div>
+    </div>
+  </section>
+
   <!-- TASS -->
   <section id="tab-tass" class="tab-content">
     <div class="hero-section">
@@ -676,11 +703,11 @@ body.dark .year-btns button {
   <section id="tab-compare" class="tab-content">
     <div class="hero-section">
       <h1 class="hero-title" style="font-size:clamp(1.4rem,3vw,2rem)">Cross-Source Comparison</h1>
-      <p class="hero-sub">How do 1TV (domestic TV) and TASS (wire service) differ in keyword coverage? Select a keyword to see both sources side-by-side.</p>
+      <p class="hero-sub">How do 1TV (domestic TV), TASS (wire service), Kremlin speeches, and MFA Telegram differ in keyword coverage? Select keywords to see all sources side-by-side.</p>
     </div>
     <div class="glass">
-      <h2>Keyword Coverage: 1TV vs TASS</h2>
-      <p class="note">Monthly percentage of articles mentioning each keyword. Select keywords to compare.</p>
+      <h2>Keyword Coverage Across Sources</h2>
+      <p class="note">Monthly percentage of articles/speeches/messages mentioning each keyword. Select keywords to compare.</p>
       <div class="btn-group" id="cmp-kw-btns"></div>
       <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
     </div>
@@ -711,7 +738,7 @@ body.dark .year-btns button {
 </main>
 
 <footer>
-  <p>Data from <a href="https://www.1tv.ru" target="_blank">1tv.ru</a> (Channel One API, machine-translated) and <a href="https://tass.com" target="_blank">TASS</a> (English wire service). 1TV translated with <a href="https://github.com/argosopentech/argos-translate" target="_blank">Argos Translate</a>.</p>
+  <p>Data from <a href="https://www.1tv.ru" target="_blank">1tv.ru</a> (Channel One API, machine-translated), <a href="https://tass.com" target="_blank">TASS</a> (English wire service), <a href="http://en.kremlin.ru" target="_blank">kremlin.ru</a> (presidential speeches), and <a href="https://t.me/s/MFARussia" target="_blank">MFA Telegram</a> (@MFARussia). 1TV translated with <a href="https://github.com/argosopentech/argos-translate" target="_blank">Argos Translate</a>.</p>
   <p style="margin-top:0.5rem;">Charles Crabtree · Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
   <p style="margin-top:0.5rem;"><a href="https://github.com/lobsterbush/kremlin-speeches" target="_blank">GitHub Repository</a></p>
 </footer>
@@ -741,7 +768,9 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'keywords' && !window._kwInit) initKeywords();
     if (t.dataset.tab === 'countries' && !window._coInit) initCountries();
     if (t.dataset.tab === 'words' && !window._wdInit) initWords();
+    if (t.dataset.tab === 'speeches' && !window._krInit) initSpeeches();
     if (t.dataset.tab === 'tass' && !window._tassInit) initTass();
+    if (t.dataset.tab === 'mfa' && !window._mfaInit) initMfa();
     if (t.dataset.tab === 'compare' && !window._cmpInit) initCompare();
     if (t.dataset.tab === 'search' && !window._srInit) initSearch();
   });
@@ -1016,6 +1045,102 @@ function drawWords() {
   }).join('');
 }
 
+/* KREMLIN SPEECHES TAB */
+let krKwData = null, krKwChart = null;
+const activeKrKW = new Set(['ukraine','military','china']);
+
+async function initSpeeches() {
+  window._krInit = true;
+  let summary, monthly, kwData;
+  try {
+    [summary, monthly, kwData] = await Promise.all([
+      F('data/kremlin/summary.json'), F('data/kremlin/monthly_volume.json'), F('data/kremlin/keyword_trends.json')
+    ]);
+  } catch(e) {
+    document.getElementById('kr-stat-cards').innerHTML = '<div class="empty-state">Kremlin speeches data not yet available.</div>';
+    return;
+  }
+
+  document.getElementById('kr-stat-cards').innerHTML = [
+    { n: summary.total_speeches.toLocaleString(), l: 'Speeches' },
+    { n: summary.years_covered, l: 'Years' },
+    { n: summary.date_start?.slice(0,4) + '\u2013' + summary.date_end?.slice(0,4), l: 'Date Range' },
+    { n: (summary.presidents || []).length, l: 'Presidents' },
+  ].map(s => `<div class="stat-card"><span class="stat-number">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
+
+  if (monthly.length) {
+    new Chart(document.getElementById('krVolume'), {
+      type: 'line',
+      data: { labels: monthly.map(d=>d.month), datasets: [{
+        data: monthly.map(d=>d.count),
+        borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.06)',
+        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+      }]},
+      options: lineOpts('Speeches per month'),
+    });
+  }
+
+  if (summary.presidents && summary.presidents.length) {
+    const pres = summary.presidents;
+    const PRES_COLORS = ['#059669','#2A9D8F','#264653'];
+    new Chart(document.getElementById('krPresidents'), {
+      type: 'bar',
+      data: {
+        labels: pres.map(p => p.name),
+        datasets: [{ data: pres.map(p => p.count),
+          backgroundColor: pres.map((_, i) => PRES_COLORS[i % PRES_COLORS.length]),
+          borderWidth: 0, borderRadius: 4, barPercentage: 0.65 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} speeches` } } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: GRID_COLOR(), drawBorder: false }, ticks: { font: FONT } },
+          y: { grid: { display: false }, ticks: { font: { family: 'Space Grotesk', size: 13, weight: 500 } } }
+        }
+      }
+    });
+  }
+
+  krKwData = kwData;
+  const box = document.getElementById('kr-kw-btns');
+  Object.keys(kwData).forEach(kw => {
+    const b = document.createElement('button');
+    b.textContent = kw;
+    if (activeKrKW.has(kw)) b.classList.add('active');
+    b.onclick = () => { activeKrKW.has(kw) ? activeKrKW.delete(kw) : activeKrKW.add(kw); b.classList.toggle('active'); drawKrKW(); };
+    box.appendChild(b);
+  });
+  drawKrKW();
+}
+
+function drawKrKW() {
+  if (!krKwData) return;
+  const firstKey = Object.keys(krKwData)[0];
+  if (!firstKey || !krKwData[firstKey].length) return;
+  const labels = krKwData[firstKey].map(d=>d.month);
+  const ds = []; let ci = 0;
+  activeKrKW.forEach(kw => {
+    if (!krKwData[kw]) return;
+    ds.push({ label: kw, data: krKwData[kw].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
+    ci++;
+  });
+  if (krKwChart) krKwChart.destroy();
+  krKwChart = new Chart(document.getElementById('krKwChart'), {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      ...lineOpts('% of speeches'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of speeches', font: { ...FONT, size: 12 } } }
+      }
+    }
+  });
+}
+
 /* TASS TAB */
 let tassKwData = null, tassKwChart = null;
 const activeTassKW = new Set(['ukraine','military','china']);
@@ -1113,16 +1238,95 @@ function drawTassKW() {
   });
 }
 
+/* MFA TAB */
+let mfaKwData = null, mfaKwChart = null;
+const activeMfaKW = new Set(['ukraine','military','china']);
+
+async function initMfa() {
+  window._mfaInit = true;
+  let summary, monthly, kwData;
+  try {
+    [summary, monthly, kwData] = await Promise.all([
+      F('data/mfa/summary.json'), F('data/mfa/monthly_volume.json'), F('data/mfa/keyword_trends.json')
+    ]);
+  } catch(e) {
+    document.getElementById('mfa-stat-cards').innerHTML = '<div class="empty-state">MFA Telegram data not yet available. Run the MFA scraper first.</div>';
+    return;
+  }
+
+  document.getElementById('mfa-stat-cards').innerHTML = [
+    { n: summary.total_messages.toLocaleString(), l: 'Messages' },
+    { n: summary.years_covered, l: 'Years' },
+    { n: summary.date_start?.slice(0,4) + '\u2013' + summary.date_end?.slice(0,4), l: 'Date Range' },
+    { n: Math.round(summary.avg_text_len).toLocaleString(), l: 'Avg Chars' },
+  ].map(s => `<div class="stat-card"><span class="stat-number">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
+
+  if (monthly.length) {
+    new Chart(document.getElementById('mfaVolume'), {
+      type: 'line',
+      data: { labels: monthly.map(d=>d.month), datasets: [{
+        data: monthly.map(d=>d.count),
+        borderColor: '#7C3AED', backgroundColor: 'rgba(124,58,237,0.06)',
+        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+      }]},
+      options: lineOpts('Messages per month'),
+    });
+  }
+
+  mfaKwData = kwData;
+  const box = document.getElementById('mfa-kw-btns');
+  Object.keys(kwData).forEach(kw => {
+    const b = document.createElement('button');
+    b.textContent = kw;
+    if (activeMfaKW.has(kw)) b.classList.add('active');
+    b.onclick = () => { activeMfaKW.has(kw) ? activeMfaKW.delete(kw) : activeMfaKW.add(kw); b.classList.toggle('active'); drawMfaKW(); };
+    box.appendChild(b);
+  });
+  drawMfaKW();
+}
+
+function drawMfaKW() {
+  if (!mfaKwData) return;
+  const firstKey = Object.keys(mfaKwData)[0];
+  if (!firstKey || !mfaKwData[firstKey].length) return;
+  const labels = mfaKwData[firstKey].map(d=>d.month);
+  const ds = []; let ci = 0;
+  activeMfaKW.forEach(kw => {
+    if (!mfaKwData[kw]) return;
+    ds.push({ label: kw, data: mfaKwData[kw].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
+    ci++;
+  });
+  if (mfaKwChart) mfaKwChart.destroy();
+  mfaKwChart = new Chart(document.getElementById('mfaKwChart'), {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      ...lineOpts('% of messages'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of messages', font: { ...FONT, size: 12 } } }
+      }
+    }
+  });
+}
+
 /* COMPARE TAB */
 let cmpData = null, cmpChart = null;
 const activeCmpKW = new Set(['ukraine','sanctions']);
+const SRC_STYLE = {
+  '1tv':    { color: '#0066cc', dash: [],      label: '1TV' },
+  'tass':   { color: '#DC2626', dash: [6, 3],  label: 'TASS' },
+  'kremlin':{ color: '#059669', dash: [2, 3],  label: 'Kremlin' },
+  'mfa':    { color: '#7C3AED', dash: [8, 4, 2, 4], label: 'MFA' },
+};
 
 async function initCompare() {
   window._cmpInit = true;
   try {
     cmpData = await F('data/compare/keyword_comparison.json');
   } catch(e) {
-    document.getElementById('cmp-kw-btns').innerHTML = '<div class="empty-state">Comparison data not yet available. Need both 1TV and TASS data.</div>';
+    document.getElementById('cmp-kw-btns').innerHTML = '<div class="empty-state">Comparison data not yet available.</div>';
     return;
   }
   const box = document.getElementById('cmp-kw-btns');
@@ -1138,35 +1342,33 @@ async function initCompare() {
 
 function drawCmp() {
   if (!cmpData) return;
-  const ds = []; let ci = 0;
-  const srcColors = { '1tv': '#0066cc', 'tass': '#DC2626' };
-  const srcDash = { '1tv': [], 'tass': [6, 3] };
+  const ds = [];
   let labels = [];
   activeCmpKW.forEach(kw => {
     const entry = cmpData[kw];
     if (!entry) return;
     for (const [src, points] of Object.entries(entry)) {
       if (points.length > labels.length) labels = points.map(d => d.month);
+      const style = SRC_STYLE[src] || { color: '#888', dash: [], label: src.toUpperCase() };
       ds.push({
-        label: `${kw} (${src.toUpperCase()})`,
+        label: `${kw} (${style.label})`,
         data: points.map(d => d.pct),
-        borderColor: ci < 2 ? srcColors[src] : PALETTE[(ci+2) % PALETTE.length],
-        borderDash: srcDash[src] || [],
+        borderColor: style.color,
+        borderDash: style.dash,
         borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false,
       });
-      ci++;
     }
   });
   if (cmpChart) cmpChart.destroy();
   cmpChart = new Chart(document.getElementById('cmpChart'), {
     type: 'line', data: { labels, datasets: ds },
     options: {
-      ...lineOpts('% of articles'),
+      ...lineOpts('% of articles/speeches/messages'),
       plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
       scales: {
         x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
         y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
-          title: { display: true, text: '% of articles', font: { ...FONT, size: 12 } } }
+          title: { display: true, text: '% of items', font: { ...FONT, size: 12 } } }
       }
     }
   });
