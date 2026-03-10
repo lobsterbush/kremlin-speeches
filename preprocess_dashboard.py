@@ -174,9 +174,31 @@ def top_words_by_year(df: pd.DataFrame) -> None:
 
 
 def search_shards(df: pd.DataFrame) -> None:
-    """Year-sharded search index with titles, snippets, word count, category."""
-    search_dir = DATA_DIR / "search"
-    search_dir.mkdir(parents=True, exist_ok=True)
+    """Year-sharded search index for 1TV."""
+    _generic_search_shards(
+        df,
+        DATA_DIR / "search",
+        title_col="title_en",
+        title_ru_col="title",
+        content_col="content_en",
+        date_col="date_extracted",
+        url_col="url",
+        cat_col="category_label",
+    )
+
+
+def _generic_search_shards(
+    df: pd.DataFrame,
+    out_dir: Path,
+    title_col: str,
+    content_col: str,
+    date_col: str = "date",
+    url_col: str = "url",
+    cat_col: str = None,
+    title_ru_col: str = None,
+) -> None:
+    """Year-sharded search index usable by any source."""
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     years_with_data = []
     total = 0
@@ -184,33 +206,36 @@ def search_shards(df: pd.DataFrame) -> None:
         ydf = df[df["year"] == year]
         records = []
         for _, r in ydf.iterrows():
-            title_en = str(r.get("title_en", "")) if pd.notna(r.get("title_en")) else ""
-            title_ru = str(r.get("title", "")) if pd.notna(r.get("title")) else ""
-            if not title_en and not title_ru:
+            title = str(r.get(title_col, "")) if pd.notna(r.get(title_col)) else ""
+            if not title:
                 continue
-            content_en = str(r.get("content_en", "")) if pd.notna(r.get("content_en")) else ""
-            content_ru = str(r.get("content", "")) if pd.notna(r.get("content")) else ""
-            cat = str(r.get("category_label", "")) if pd.notna(r.get("category_label")) else ""
-            wc = len(content_en.split()) if content_en else 0
+            content = str(r.get(content_col, "")) if pd.notna(r.get(content_col)) else ""
+            wc = len(content.split()) if content else 0
+            date_val = r.get(date_col, r.get("date", ""))
+            date_str = str(date_val)[:10] if pd.notna(date_val) else ""
+            url_val = r.get(url_col, "")
             rec = {
-                "t": title_en[:150],
-                "r": title_ru[:150],
-                "d": str(r["date_extracted"])[:10] if pd.notna(r.get("date_extracted")) else "",
-                "u": str(r["url"]) if pd.notna(r.get("url")) else "",
-                "s": content_en[:120],
+                "t": title[:150],
+                "d": date_str,
+                "u": str(url_val) if pd.notna(url_val) else "",
+                "s": content[:120],
                 "wc": wc,
             }
-            if cat:
-                rec["cat"] = cat
+            if title_ru_col:
+                ru = str(r.get(title_ru_col, "")) if pd.notna(r.get(title_ru_col)) else ""
+                if ru:
+                    rec["r"] = ru[:150]
+            if cat_col:
+                cat = str(r.get(cat_col, "")) if pd.notna(r.get(cat_col)) else ""
+                if cat:
+                    rec["cat"] = cat
             records.append(rec)
         yr = str(int(year))
-        (search_dir / f"{yr}.json").write_text(
-            json.dumps(records, ensure_ascii=False)
-        )
+        (out_dir / f"{yr}.json").write_text(json.dumps(records, ensure_ascii=False))
         years_with_data.append(yr)
         total += len(records)
-    (search_dir / "years.json").write_text(json.dumps(years_with_data))
-    print(f"  search shards: {total} articles across {len(years_with_data)} years")
+    (out_dir / "years.json").write_text(json.dumps(years_with_data))
+    print(f"  search shards: {total} items across {len(years_with_data)} years")
 
 
 def summary_stats(df: pd.DataFrame) -> None:
@@ -343,8 +368,15 @@ def kremlin_stats(df: pd.DataFrame) -> None:
     (kr_dir / "country_mentions.json").write_text(json.dumps(co_results))
     print(f"  kremlin/country_mentions.json: {len(co_results)} countries")
 
+    # Search shards
+    _generic_search_shards(
+        df, kr_dir / "search",
+        title_col="title", content_col="content",
+        url_col="url",
+    )
 
-# ── TASS data generation ───────────────────────────────────────────────────────
+
+# ── TASS data generation
 
 def load_tass() -> pd.DataFrame:
     """Load TASS articles CSV if available."""
@@ -430,6 +462,13 @@ def tass_stats(df: pd.DataFrame) -> None:
         ]
     (tass_dir / "country_mentions.json").write_text(json.dumps(co_results))
     print(f"  tass/country_mentions.json: {len(co_results)} countries")
+
+    # Search shards
+    _generic_search_shards(
+        df, tass_dir / "search",
+        title_col="title", content_col="content",
+        url_col="url", cat_col="category",
+    )
 
 
 def cross_source_comparison(
@@ -546,6 +585,50 @@ def mfa_stats(df: pd.DataFrame) -> None:
     (mfa_dir / "country_mentions.json").write_text(json.dumps(co_results))
     print(f"  mfa/country_mentions.json: {len(co_results)} countries")
 
+    # Search shards
+    _generic_search_shards(
+        df, mfa_dir / "search",
+        title_col="text", content_col="text",
+    )
+
+
+def overview_summary(
+    sources: dict[str, pd.DataFrame],
+) -> None:
+    """Generate combined overview JSON for all sources."""
+    overview_dir = DATA_DIR / "overview"
+    overview_dir.mkdir(parents=True, exist_ok=True)
+
+    src_list = []
+    for name, df in sources.items():
+        if df is None or len(df) == 0:
+            continue
+        src_list.append({
+            "name": name,
+            "count": len(df),
+            "date_start": str(df["date"].min().date()),
+            "date_end": str(df["date"].max().date()),
+        })
+    total = sum(s["count"] for s in src_list)
+    (overview_dir / "summary.json").write_text(json.dumps({
+        "total_items": total,
+        "sources": src_list,
+    }))
+    print(f"  overview/summary.json: {total} total items across {len(src_list)} sources")
+
+    # Combined monthly volume per source
+    combined = {}
+    for name, df in sources.items():
+        if df is None or len(df) == 0:
+            continue
+        counts = df.groupby("month").size().reset_index(name="count")
+        combined[name] = [
+            {"month": r["month"], "count": int(r["count"])}
+            for _, r in counts.iterrows()
+        ]
+    (overview_dir / "volume_by_source.json").write_text(json.dumps(combined))
+    print(f"  overview/volume_by_source.json: {len(combined)} sources")
+
 
 def main():
     print("Loading 1TV data...")
@@ -590,6 +673,14 @@ def main():
 
     print("\nGenerating cross-source comparison:")
     cross_source_comparison(df, tass_df, kremlin_df, mfa_df)
+
+    print("\nGenerating overview:")
+    overview_summary({
+        "1TV": df,
+        "Kremlin": kremlin_df,
+        "TASS": tass_df,
+        "MFA": mfa_df,
+    })
 
     print("\nDone!")
 
