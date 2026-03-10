@@ -236,12 +236,128 @@ def summary_stats(df: pd.DataFrame) -> None:
     print(f"  summary.json: {stats}")
 
 
-def main():
-    print("Loading data...")
-    df = load_data()
-    print(f"Loaded {len(df)} rows.\n")
+# ── TASS data generation ───────────────────────────────────────────────────────
 
-    print("Generating JSON files:")
+def load_tass() -> pd.DataFrame:
+    """Load TASS articles CSV if available."""
+    path = BASE / "tass_articles.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, low_memory=False)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = (
+        df["title"].fillna("").astype(str)
+        + " "
+        + df["content"].fillna("").astype(str)
+        + " "
+        + df["lead"].fillna("").astype(str)
+    ).str.lower()
+    return df
+
+
+def tass_stats(df: pd.DataFrame) -> None:
+    """Generate TASS summary, volume, keywords, and category data."""
+    tass_dir = DATA_DIR / "tass"
+    tass_dir.mkdir(parents=True, exist_ok=True)
+
+    # Summary
+    stats = {
+        "total_articles": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_content_len": round(df["content"].astype(str).str.len().mean(), 0),
+        "categories": [
+            {"name": str(c), "count": int(n)}
+            for c, n in df["category"].value_counts().items()
+        ],
+    }
+    (tass_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  tass/summary.json: {stats['total_articles']} articles")
+
+    # Monthly volume
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (tass_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  tass/monthly_volume.json: {len(data)} months")
+
+    # Keyword trends
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (tass_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  tass/keyword_trends.json: {len(kw_results)} keywords")
+
+    # Country mentions
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (tass_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  tass/country_mentions.json: {len(co_results)} countries")
+
+
+def cross_source_comparison(otv_df: pd.DataFrame, tass_df: pd.DataFrame) -> None:
+    """Generate cross-source keyword comparison data."""
+    compare_dir = DATA_DIR / "compare"
+    compare_dir.mkdir(parents=True, exist_ok=True)
+
+    # For each keyword, produce monthly pct for both sources
+    results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        entry = {}
+        for label, df in [("1tv", otv_df), ("tass", tass_df)]:
+            if len(df) == 0:
+                continue
+            monthly = (
+                df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+                .groupby("month")["has_kw"]
+                .mean()
+                .reset_index()
+            )
+            entry[label] = [
+                {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+                for _, r in monthly.iterrows()
+            ]
+        results[kw] = entry
+    (compare_dir / "keyword_comparison.json").write_text(json.dumps(results))
+    print(f"  compare/keyword_comparison.json: {len(results)} keywords")
+
+
+def main():
+    print("Loading 1TV data...")
+    df = load_data()
+    print(f"Loaded {len(df)} 1TV rows.\n")
+
+    print("Generating 1TV JSON files:")
     summary_stats(df)
     monthly_volume(df)
     yearly_stats(df)
@@ -249,6 +365,17 @@ def main():
     country_mentions(df)
     top_words_by_year(df)
     search_shards(df)
+
+    print("\nLoading TASS data...")
+    tass_df = load_tass()
+    if len(tass_df) > 0:
+        print(f"Loaded {len(tass_df)} TASS rows.\n")
+        print("Generating TASS JSON files:")
+        tass_stats(tass_df)
+        print("\nGenerating cross-source comparison:")
+        cross_source_comparison(df, tass_df)
+    else:
+        print("No TASS data found, skipping.\n")
 
     print("\nDone!")
 

@@ -557,7 +557,7 @@ body.dark .year-btns button {
 
 <nav class="nav">
   <div class="nav-inner">
-    <div class="nav-brand">1TV <span>Новости</span> Archive</div>
+    <div class="nav-brand">Kremlin <span>Media</span> Tracker</div>
     <div class="nav-right">
       <button class="theme-toggle" id="theme-btn" title="Toggle dark mode">◑</button>
     </div>
@@ -570,6 +570,8 @@ body.dark .year-btns button {
   <button class="tab" data-tab="keywords" role="tab">Keywords</button>
   <button class="tab" data-tab="countries" role="tab">Countries</button>
   <button class="tab" data-tab="words" role="tab">Top Words</button>
+  <button class="tab" data-tab="tass" role="tab">TASS</button>
+  <button class="tab" data-tab="compare" role="tab">Compare</button>
   <button class="tab" data-tab="search" role="tab">Search</button>
 </div>
 
@@ -645,6 +647,45 @@ body.dark .year-btns button {
     </div>
   </section>
 
+  <!-- TASS -->
+  <section id="tab-tass" class="tab-content">
+    <div class="hero-section">
+      <h1 class="hero-title" style="font-size:clamp(1.4rem,3vw,2rem)">TASS <span class="ru">ТАСС</span> — State Wire Service</h1>
+      <p class="hero-sub">Full English-language articles from Russia's official news agency. TASS distributes the Kremlin's narrative to domestic and international outlets. Already in English — no translation needed.</p>
+    </div>
+    <div class="stat-cards" id="tass-stat-cards"></div>
+    <div class="glass">
+      <h2>TASS Monthly Volume</h2>
+      <p class="note">Articles published per month</p>
+      <div class="chart-wrap"><canvas id="tassVolume"></canvas></div>
+    </div>
+    <div class="glass">
+      <h2>TASS Category Breakdown</h2>
+      <p class="note">Categories from URL structure (politics, world, economy, etc.)</p>
+      <div class="chart-wrap" style="max-height:420px;"><canvas id="tassCategories"></canvas></div>
+    </div>
+    <div class="glass">
+      <h2>TASS Keyword Tracker</h2>
+      <p class="note">Percentage of TASS articles mentioning each keyword per month</p>
+      <div class="btn-group" id="tass-kw-btns"></div>
+      <div class="chart-wrap"><canvas id="tassKwChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="tab-compare" class="tab-content">
+    <div class="hero-section">
+      <h1 class="hero-title" style="font-size:clamp(1.4rem,3vw,2rem)">Cross-Source Comparison</h1>
+      <p class="hero-sub">How do 1TV (domestic TV) and TASS (wire service) differ in keyword coverage? Select a keyword to see both sources side-by-side.</p>
+    </div>
+    <div class="glass">
+      <h2>Keyword Coverage: 1TV vs TASS</h2>
+      <p class="note">Monthly percentage of articles mentioning each keyword. Select keywords to compare.</p>
+      <div class="btn-group" id="cmp-kw-btns"></div>
+      <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
+    </div>
+  </section>
+
   <!-- SEARCH -->
   <section id="tab-search" class="tab-content">
     <div class="glass">
@@ -670,7 +711,7 @@ body.dark .year-btns button {
 </main>
 
 <footer>
-  <p>Data from <a href="https://www.1tv.ru" target="_blank">1tv.ru</a> via Channel One API. Translated with <a href="https://github.com/argosopentech/argos-translate" target="_blank">Argos Translate</a> (offline NMT).</p>
+  <p>Data from <a href="https://www.1tv.ru" target="_blank">1tv.ru</a> (Channel One API, machine-translated) and <a href="https://tass.com" target="_blank">TASS</a> (English wire service). 1TV translated with <a href="https://github.com/argosopentech/argos-translate" target="_blank">Argos Translate</a>.</p>
   <p style="margin-top:0.5rem;">Charles Crabtree · Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
   <p style="margin-top:0.5rem;"><a href="https://github.com/lobsterbush/kremlin-speeches" target="_blank">GitHub Repository</a></p>
 </footer>
@@ -700,6 +741,8 @@ document.querySelectorAll('.tab').forEach(t => {
     if (t.dataset.tab === 'keywords' && !window._kwInit) initKeywords();
     if (t.dataset.tab === 'countries' && !window._coInit) initCountries();
     if (t.dataset.tab === 'words' && !window._wdInit) initWords();
+    if (t.dataset.tab === 'tass' && !window._tassInit) initTass();
+    if (t.dataset.tab === 'compare' && !window._cmpInit) initCompare();
     if (t.dataset.tab === 'search' && !window._srInit) initSearch();
   });
 });
@@ -971,6 +1014,162 @@ function drawWords() {
     const pct = (w.count / max * 100).toFixed(0);
     return `<div class="word-bar"><span class="w">${w.word}</span><span class="b" style="width:${pct}%"></span><span class="c">${w.count.toLocaleString()}</span></div>`;
   }).join('');
+}
+
+/* TASS TAB */
+let tassKwData = null, tassKwChart = null;
+const activeTassKW = new Set(['ukraine','military','china']);
+
+async function initTass() {
+  window._tassInit = true;
+  let summary, monthly, kwData;
+  try {
+    [summary, monthly, kwData] = await Promise.all([
+      F('data/tass/summary.json'), F('data/tass/monthly_volume.json'), F('data/tass/keyword_trends.json')
+    ]);
+  } catch(e) {
+    document.getElementById('tass-stat-cards').innerHTML = '<div class="empty-state">TASS data not yet available. Run the TASS scraper first.</div>';
+    return;
+  }
+
+  document.getElementById('tass-stat-cards').innerHTML = [
+    { n: summary.total_articles.toLocaleString(), l: 'Articles' },
+    { n: summary.years_covered, l: 'Years' },
+    { n: summary.date_start?.slice(0,4) + '–' + summary.date_end?.slice(0,4), l: 'Date Range' },
+    { n: Math.round(summary.avg_content_len).toLocaleString(), l: 'Avg Chars' },
+  ].map(s => `<div class="stat-card"><span class="stat-number">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
+
+  if (monthly.length) {
+    new Chart(document.getElementById('tassVolume'), {
+      type: 'line',
+      data: { labels: monthly.map(d=>d.month), datasets: [{
+        data: monthly.map(d=>d.count),
+        borderColor: '#DC2626', backgroundColor: 'rgba(220,38,38,0.06)',
+        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+      }]},
+      options: lineOpts('Articles per month'),
+    });
+  }
+
+  if (summary.categories) {
+    const cats = summary.categories;
+    const total = cats.reduce((s, c) => s + c.count, 0);
+    new Chart(document.getElementById('tassCategories'), {
+      type: 'bar',
+      data: {
+        labels: cats.map(c => c.name),
+        datasets: [{ data: cats.map(c => c.count),
+          backgroundColor: cats.map((_, i) => PALETTE[i % PALETTE.length]),
+          borderWidth: 0, borderRadius: 4, barPercentage: 0.75 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} (${(ctx.parsed.x/total*100).toFixed(1)}%)` } } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: GRID_COLOR(), drawBorder: false },
+            ticks: { font: FONT, callback: v => v >= 1000 ? (v/1000)+'K' : v } },
+          y: { grid: { display: false }, ticks: { font: { family: 'Space Grotesk', size: 13, weight: 500 } } }
+        }
+      }
+    });
+  }
+
+  tassKwData = kwData;
+  const box = document.getElementById('tass-kw-btns');
+  Object.keys(kwData).forEach(kw => {
+    const b = document.createElement('button');
+    b.textContent = kw;
+    if (activeTassKW.has(kw)) b.classList.add('active');
+    b.onclick = () => { activeTassKW.has(kw) ? activeTassKW.delete(kw) : activeTassKW.add(kw); b.classList.toggle('active'); drawTassKW(); };
+    box.appendChild(b);
+  });
+  drawTassKW();
+}
+
+function drawTassKW() {
+  if (!tassKwData) return;
+  const firstKey = Object.keys(tassKwData)[0];
+  if (!firstKey || !tassKwData[firstKey].length) return;
+  const labels = tassKwData[firstKey].map(d=>d.month);
+  const ds = []; let ci = 0;
+  activeTassKW.forEach(kw => {
+    if (!tassKwData[kw]) return;
+    ds.push({ label: kw, data: tassKwData[kw].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
+    ci++;
+  });
+  if (tassKwChart) tassKwChart.destroy();
+  tassKwChart = new Chart(document.getElementById('tassKwChart'), {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      ...lineOpts('% of articles'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of articles', font: { ...FONT, size: 12 } } }
+      }
+    }
+  });
+}
+
+/* COMPARE TAB */
+let cmpData = null, cmpChart = null;
+const activeCmpKW = new Set(['ukraine','sanctions']);
+
+async function initCompare() {
+  window._cmpInit = true;
+  try {
+    cmpData = await F('data/compare/keyword_comparison.json');
+  } catch(e) {
+    document.getElementById('cmp-kw-btns').innerHTML = '<div class="empty-state">Comparison data not yet available. Need both 1TV and TASS data.</div>';
+    return;
+  }
+  const box = document.getElementById('cmp-kw-btns');
+  Object.keys(cmpData).forEach(kw => {
+    const b = document.createElement('button');
+    b.textContent = kw;
+    if (activeCmpKW.has(kw)) b.classList.add('active');
+    b.onclick = () => { activeCmpKW.has(kw) ? activeCmpKW.delete(kw) : activeCmpKW.add(kw); b.classList.toggle('active'); drawCmp(); };
+    box.appendChild(b);
+  });
+  drawCmp();
+}
+
+function drawCmp() {
+  if (!cmpData) return;
+  const ds = []; let ci = 0;
+  const srcColors = { '1tv': '#0066cc', 'tass': '#DC2626' };
+  const srcDash = { '1tv': [], 'tass': [6, 3] };
+  let labels = [];
+  activeCmpKW.forEach(kw => {
+    const entry = cmpData[kw];
+    if (!entry) return;
+    for (const [src, points] of Object.entries(entry)) {
+      if (points.length > labels.length) labels = points.map(d => d.month);
+      ds.push({
+        label: `${kw} (${src.toUpperCase()})`,
+        data: points.map(d => d.pct),
+        borderColor: ci < 2 ? srcColors[src] : PALETTE[(ci+2) % PALETTE.length],
+        borderDash: srcDash[src] || [],
+        borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false,
+      });
+      ci++;
+    }
+  });
+  if (cmpChart) cmpChart.destroy();
+  cmpChart = new Chart(document.getElementById('cmpChart'), {
+    type: 'line', data: { labels, datasets: ds },
+    options: {
+      ...lineOpts('% of articles'),
+      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: GRID_COLOR() }, ticks: { font: FONT, callback: v => v+'%' },
+          title: { display: true, text: '% of articles', font: { ...FONT, size: 12 } } }
+      }
+    }
+  });
 }
 
 /* SEARCH */
