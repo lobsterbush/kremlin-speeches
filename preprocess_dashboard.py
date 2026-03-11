@@ -3,6 +3,7 @@
 import json
 import re
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -476,6 +477,7 @@ def cross_source_comparison(
     tass_df: pd.DataFrame,
     kremlin_df: pd.DataFrame = None,
     mfa_df: pd.DataFrame = None,
+    rt_df: pd.DataFrame = None,
 ) -> None:
     """Generate cross-source keyword comparison data."""
     compare_dir = DATA_DIR / "compare"
@@ -486,6 +488,8 @@ def cross_source_comparison(
         sources.append(("kremlin", kremlin_df))
     if mfa_df is not None and len(mfa_df) > 0:
         sources.append(("mfa", mfa_df))
+    if rt_df is not None and len(rt_df) > 0:
+        sources.append(("rt", rt_df))
 
     results = {}
     for kw in TRACKED_KEYWORDS:
@@ -592,8 +596,102 @@ def mfa_stats(df: pd.DataFrame) -> None:
     )
 
 
+# ── RT data generation ─────────────────────────────────────────────────────────
+
+def load_rt() -> pd.DataFrame:
+    """Load RT articles CSV if available."""
+    path = BASE / "rt_articles.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, low_memory=False)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = (
+        df["title"].fillna("").astype(str)
+        + " "
+        + df["content"].fillna("").astype(str)
+        + " "
+        + df["lead"].fillna("").astype(str)
+    ).str.lower()
+    return df
+
+
+def rt_stats(df: pd.DataFrame) -> None:
+    """Generate RT summary, volume, keywords, and category data."""
+    rt_dir = DATA_DIR / "rt"
+    rt_dir.mkdir(parents=True, exist_ok=True)
+
+    stats = {
+        "total_articles": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_content_len": round(df["content"].astype(str).str.len().mean(), 0),
+        "categories": [
+            {"name": str(c), "count": int(n)}
+            for c, n in df["category"].value_counts().items()
+        ],
+    }
+    (rt_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  rt/summary.json: {stats['total_articles']} articles")
+
+    # Monthly volume
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (rt_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  rt/monthly_volume.json: {len(data)} months")
+
+    # Keyword trends
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (rt_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  rt/keyword_trends.json: {len(kw_results)} keywords")
+
+    # Country mentions
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (rt_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  rt/country_mentions.json: {len(co_results)} countries")
+
+    # Search shards
+    _generic_search_shards(
+        df, rt_dir / "search",
+        title_col="title", content_col="content",
+        url_col="url", cat_col="category",
+    )
+
+
 def overview_summary(
-    sources: dict[str, pd.DataFrame],
+    sources: dict,
 ) -> None:
     """Generate combined overview JSON for all sources."""
     overview_dir = DATA_DIR / "overview"
@@ -613,6 +711,7 @@ def overview_summary(
     (overview_dir / "summary.json").write_text(json.dumps({
         "total_items": total,
         "sources": src_list,
+        "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }))
     print(f"  overview/summary.json: {total} total items across {len(src_list)} sources")
 
@@ -628,6 +727,41 @@ def overview_summary(
         ]
     (overview_dir / "volume_by_source.json").write_text(json.dumps(combined))
     print(f"  overview/volume_by_source.json: {len(combined)} sources")
+
+
+def cross_source_country_comparison(
+    sources: list,
+) -> None:
+    """Generate cross-source country comparison data."""
+    compare_dir = DATA_DIR / "compare"
+    compare_dir.mkdir(parents=True, exist_ok=True)
+
+    results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        entry = {}
+        for label, df in sources:
+            if len(df) == 0:
+                continue
+            monthly = (
+                df.assign(has=df["text"].str.contains(pattern, na=False))
+                .groupby("month")["has"]
+                .mean()
+                .reset_index()
+            )
+            entry[label] = [
+                {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+                for _, r in monthly.iterrows()
+            ]
+        results[country] = entry
+    (compare_dir / "country_comparison.json").write_text(json.dumps(results))
+    print(f"  compare/country_comparison.json: {len(results)} countries, {len(sources)} sources")
 
 
 def main():
@@ -671,8 +805,22 @@ def main():
     else:
         print("No MFA data found, skipping.\n")
 
+    print("\nLoading RT data...")
+    rt_df = load_rt()
+    if len(rt_df) > 0:
+        print(f"Loaded {len(rt_df)} RT rows.\n")
+        print("Generating RT JSON files:")
+        rt_stats(rt_df)
+    else:
+        print("No RT data found, skipping.\n")
+
+    all_sources = [("1tv", df), ("tass", tass_df), ("kremlin", kremlin_df), ("mfa", mfa_df), ("rt", rt_df)]
+
     print("\nGenerating cross-source comparison:")
-    cross_source_comparison(df, tass_df, kremlin_df, mfa_df)
+    cross_source_comparison(df, tass_df, kremlin_df, mfa_df, rt_df)
+
+    print("\nGenerating cross-source country comparison:")
+    cross_source_country_comparison(all_sources)
 
     print("\nGenerating overview:")
     overview_summary({
@@ -680,6 +828,7 @@ def main():
         "Kremlin": kremlin_df,
         "TASS": tass_df,
         "MFA": mfa_df,
+        "RT": rt_df,
     })
 
     print("\nDone!")

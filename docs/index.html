@@ -7,547 +7,410 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
 <style>
-:root {
-  --bg: #fafafa; --surface: #fff; --text: #1a1a2e; --text-muted: #64748b;
-  --border-light: #e2e8f0; --accent: #0066cc; --accent-light: rgba(0,102,204,0.08);
-  --radius: 12px; --shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
-body.dark {
-  --bg: #0f0f1a; --surface: #1a1a2e; --text: #e2e8f0; --text-muted: #94a3b8;
-  --border-light: #2d2d44; --accent: #60a5fa; --accent-light: rgba(96,165,250,0.1);
-  --shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); }
-
-/* Progress */
-#progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 999; width: 0; transition: width 0.1s; }
-
-/* Nav */
-.nav { background: var(--surface); border-bottom: 1px solid var(--border-light); padding: 0.75rem 1.5rem; position: sticky; top: 0; z-index: 100; }
-.nav-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
-.nav-brand { font-weight: 700; font-size: 1.1rem; } .nav-brand span { color: var(--accent); }
-.theme-toggle { background: none; border: 1px solid var(--border-light); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; color: var(--text); }
-
-/* Tabs */
-.tabs { display: flex; gap: 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--border-light); padding: 0 1.5rem; max-width: 1200px; margin: 0 auto; }
-.tab { padding: 0.65rem 1rem; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font: 500 0.85rem 'Space Grotesk'; color: var(--text-muted); white-space: nowrap; transition: all 0.15s; }
-.tab:hover { color: var(--text); } .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-/* Layout */
-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-.tab-content { display: none; } .tab-content.active { display: block; }
-.glass { background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); }
-.glass h2 { font-size: 1.1rem; margin-bottom: 0.25rem; } .note { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem; }
-.chart-wrap { position: relative; height: 320px; }
-
-/* Stat cards */
-.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-.stat-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 1rem; text-align: center; box-shadow: var(--shadow); animation: countUp 0.5s ease both; }
-.stat-number { display: block; font-size: 1.5rem; font-weight: 700; color: var(--accent); }
-.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-@keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Hero */
-.hero-section { margin-bottom: 1.5rem; }
-.hero-title { font-size: clamp(1.4rem,3vw,2rem); font-weight: 700; line-height: 1.2; margin-bottom: 0.5rem; }
-.hero-title .ru { font-weight: 400; color: var(--text-muted); font-size: 0.75em; }
-.hero-sub { color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; max-width: 800px; }
-
-/* Buttons */
-.btn-group { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
-.btn-group button { padding: 0.3rem 0.7rem; border: 1px solid var(--border-light); border-radius: 20px; background: var(--bg); font: 500 0.75rem 'Space Grotesk'; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
-.btn-group button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.btn-group button:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
-
-/* Source cards */
-.source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.source-card { background: var(--surface); border-left: 4px solid; border-radius: var(--radius); padding: 1rem 1.2rem; box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s; }
-.source-card:hover { transform: translateY(-2px); }
-.source-card h3 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-.source-card .sc-count { font-size: 1.6rem; font-weight: 700; }
-.source-card .sc-meta { font-size: 0.75rem; color: var(--text-muted); }
-
-/* Search */
-.search-wrap { margin-bottom: 1rem; }
-.search-row { display: flex; gap: 0.5rem; }
-.search-row input { flex: 1; padding: 0.6rem 0.8rem; border: 1px solid var(--border-light); border-radius: 8px; font: 0.85rem 'Space Grotesk'; background: var(--bg); color: var(--text); }
-.search-row select { padding: 0.6rem; border: 1px solid var(--border-light); border-radius: 8px; font: 0.85rem 'Space Grotesk'; background: var(--bg); color: var(--text); }
-.search-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
-.result-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border-light); }
-.result-item .en-title { font-weight: 500; display: block; } .result-item .ru-title { font-size: 0.8rem; color: var(--text-muted); }
-.result-item .snippet { font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem; }
-.result-item .result-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.result-item .cat-badge { background: var(--accent-light); color: var(--accent); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; }
-.result-item strong { background: rgba(255,200,0,0.2); padding: 0 2px; border-radius: 2px; }
-.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.9rem; }
-.empty-state .big { font-size: 2rem; margin-bottom: 0.5rem; }
-
-footer { max-width: 1200px; margin: 2rem auto; padding: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-light); }
-footer a { color: var(--accent); }
-#btt { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; border: none; cursor: pointer; font-size: 1rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-#btt.visible { opacity: 1; pointer-events: auto; }
-::selection { background: var(--accent); color: #fff; }
+:root{--bg:#fafafa;--surface:#fff;--text:#1a1a2e;--text-muted:#64748b;--border-light:#e2e8f0;--accent:#0066cc;--accent-light:rgba(0,102,204,0.08);--radius:12px;--shadow:0 1px 3px rgba(0,0,0,0.06)}
+body.dark{--bg:#0f0f1a;--surface:#1a1a2e;--text:#e2e8f0;--text-muted:#94a3b8;--border-light:#2d2d44;--accent:#60a5fa;--accent-light:rgba(96,165,250,0.1);--shadow:0 1px 3px rgba(0,0,0,0.3)}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:999;width:0;transition:width .1s}
+.nav{background:var(--surface);border-bottom:1px solid var(--border-light);padding:.75rem 1.5rem;position:sticky;top:0;z-index:100}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.nav-brand{font-weight:700;font-size:1.1rem}.nav-brand span{color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:.5rem}
+.last-updated{font:400 .7rem 'IBM Plex Mono',monospace;color:var(--text-muted)}
+.theme-toggle{background:none;border:1px solid var(--border-light);border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:1rem;color:var(--text)}
+.tabs{display:flex;gap:0;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border-light);padding:0 1.5rem;max-width:1200px;margin:0 auto}
+.tab{padding:.65rem 1rem;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font:500 .85rem 'Space Grotesk';color:var(--text-muted);white-space:nowrap;transition:all .15s}
+.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+main{max-width:1200px;margin:0 auto;padding:1.5rem}
+.tab-content{display:none}.tab-content.active{display:block}
+.glass{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem;box-shadow:var(--shadow)}
+.glass h2{font-size:1.1rem;margin-bottom:.25rem}.note{color:var(--text-muted);font-size:.8rem;margin-bottom:1rem}
+.chart-wrap{position:relative;height:320px}
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:1rem;text-align:center;box-shadow:var(--shadow);animation:fadeUp .5s ease both}
+.stat-number{display:block;font-size:1.5rem;font-weight:700;color:var(--accent)}.stat-label{font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.hero-section{margin-bottom:1.5rem}.hero-title{font-size:clamp(1.4rem,3vw,2rem);font-weight:700;line-height:1.2;margin-bottom:.5rem}
+.hero-title .ru{font-weight:400;color:var(--text-muted);font-size:.75em}
+.hero-sub{color:var(--text-muted);font-size:.85rem;line-height:1.6;max-width:800px}
+.btn-group{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+.btn-group button{padding:.3rem .7rem;border:1px solid var(--border-light);border-radius:20px;background:var(--bg);font:500 .75rem 'Space Grotesk';color:var(--text-muted);cursor:pointer;transition:all .15s}
+.btn-group button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-group button:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+.source-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.source-card{background:var(--surface);border-left:4px solid;border-radius:var(--radius);padding:1rem 1.2rem;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s}
+.source-card:hover{transform:translateY(-2px)}.source-card h3{font-size:.9rem;margin-bottom:.25rem}
+.source-card .sc-count{font-size:1.5rem;font-weight:700}.source-card .sc-meta{font-size:.72rem;color:var(--text-muted)}
+.search-wrap{margin-bottom:1rem}.search-row{display:flex;gap:.5rem}
+.search-row input{flex:1;padding:.6rem .8rem;border:1px solid var(--border-light);border-radius:8px;font:.85rem 'Space Grotesk';background:var(--bg);color:var(--text)}
+.search-row select{padding:.6rem;border:1px solid var(--border-light);border-radius:8px;font:.85rem 'Space Grotesk';background:var(--bg);color:var(--text)}
+.search-meta{display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;font-size:.8rem;color:var(--text-muted)}
+.result-item{padding:.75rem 0;border-bottom:1px solid var(--border-light)}
+.result-item .en-title{font-weight:500;display:block}.result-item .ru-title{font-size:.8rem;color:var(--text-muted)}
+.result-item .snippet{font-size:.8rem;color:var(--text-muted);display:block;margin-top:.25rem}
+.result-item .result-meta{font-size:.75rem;color:var(--text-muted);margin-top:.25rem;display:flex;gap:.75rem;flex-wrap:wrap}
+.result-item .cat-badge{background:var(--accent-light);color:var(--accent);padding:.1rem .4rem;border-radius:4px;font-size:.7rem}
+.result-item strong{background:rgba(255,200,0,0.2);padding:0 2px;border-radius:2px}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted);font-size:.9rem}.empty-state .big{font-size:2rem;margin-bottom:.5rem}
+.loading{text-align:center;padding:4rem 1rem;color:var(--text-muted)}.loading::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--border-light);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-left:.5rem;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.mode-toggle{display:inline-flex;border:1px solid var(--border-light);border-radius:8px;overflow:hidden;margin-bottom:1rem;font-size:.75rem}
+.mode-toggle button{padding:.35rem .75rem;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;font:500 .75rem 'Space Grotesk'}
+.mode-toggle button.active{background:var(--accent);color:#fff}
+footer{max-width:1200px;margin:2rem auto;padding:1.5rem;text-align:center;font-size:.75rem;color:var(--text-muted);border-top:1px solid var(--border-light)}footer a{color:var(--accent)}
+#btt{position:fixed;bottom:1.5rem;right:1.5rem;width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1rem;opacity:0;transition:opacity .2s;pointer-events:none}
+#btt.visible{opacity:1;pointer-events:auto}::selection{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
 <div id="progress"></div>
 <nav class="nav"><div class="nav-inner">
   <div class="nav-brand">Kremlin <span>Media</span> Tracker</div>
-  <button class="theme-toggle" id="theme-btn" title="Toggle dark mode">&#9681;</button>
+  <div class="nav-right">
+    <span class="last-updated" id="lastUp"></span>
+    <button class="theme-toggle" id="theme-btn" title="Toggle dark mode">&#9681;</button>
+  </div>
 </div></nav>
-
 <div class="tabs" role="tablist">
   <button class="tab active" data-tab="overview" role="tab">Overview</button>
   <button class="tab" data-tab="1tv" role="tab">1TV</button>
   <button class="tab" data-tab="kremlin" role="tab">Kremlin</button>
   <button class="tab" data-tab="tass" role="tab">TASS</button>
   <button class="tab" data-tab="mfa" role="tab">MFA</button>
+  <button class="tab" data-tab="rt" role="tab">RT</button>
   <button class="tab" data-tab="compare" role="tab">Compare</button>
 </div>
-
 <main>
-
-<!-- ═══ OVERVIEW ═══ -->
 <section id="tab-overview" class="tab-content active">
   <div class="hero-section">
     <h1 class="hero-title">Kremlin Media Tracker</h1>
-    <p class="hero-sub">Multi-source tracking of Russian state media and official communications. Four sources: Channel One TV (1TV), Kremlin presidential speeches, TASS wire service, and MFA Telegram. Updated daily.</p>
+    <p class="hero-sub">Multi-source tracking of Russian state media and official communications. Five sources: Channel One (1TV), Kremlin speeches, TASS, MFA Telegram, and RT. Updated daily via GitHub Actions.</p>
   </div>
   <div id="ov-source-cards" class="source-cards"></div>
   <div class="glass">
     <h2>Volume by Source</h2>
-    <p class="note">Monthly item counts across all sources. Click a source card above to jump to its tab.</p>
+    <p class="note">Monthly item counts. Toggle between absolute and normalized (%) views.</p>
+    <div class="mode-toggle" id="ov-mode"><button class="active" data-m="abs">Absolute</button><button data-m="pct">Normalized %</button></div>
     <div class="chart-wrap"><canvas id="ovVolume"></canvas></div>
   </div>
 </section>
-
-<!-- ═══ SOURCE TABS (generated by JS) ═══ -->
-<section id="tab-1tv" class="tab-content"></section>
-<section id="tab-kremlin" class="tab-content"></section>
-<section id="tab-tass" class="tab-content"></section>
-<section id="tab-mfa" class="tab-content"></section>
-
-<!-- ═══ COMPARE ═══ -->
+<section id="tab-1tv" class="tab-content"><div class="loading">Loading 1TV data</div></section>
+<section id="tab-kremlin" class="tab-content"><div class="loading">Loading Kremlin data</div></section>
+<section id="tab-tass" class="tab-content"><div class="loading">Loading TASS data</div></section>
+<section id="tab-mfa" class="tab-content"><div class="loading">Loading MFA data</div></section>
+<section id="tab-rt" class="tab-content"><div class="loading">Loading RT data</div></section>
 <section id="tab-compare" class="tab-content">
   <div class="hero-section">
     <h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">Cross-Source Comparison</h1>
-    <p class="hero-sub">Select keywords to compare how 1TV, TASS, Kremlin speeches, and MFA Telegram cover the same topics.</p>
+    <p class="hero-sub">Compare keyword and country coverage across all five sources.</p>
   </div>
   <div class="glass">
-    <h2>Keyword Coverage Across Sources</h2>
-    <p class="note">Monthly % of items mentioning keyword. 1TV=solid, TASS=dashed, Kremlin=dotted, MFA=dash-dot.</p>
+    <h2>Keyword Comparison</h2>
+    <p class="note">Monthly % of items mentioning keyword by source.</p>
     <div class="btn-group" id="cmp-kw-btns"></div>
-    <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
+    <div class="chart-wrap"><canvas id="cmpKwChart"></canvas></div>
+  </div>
+  <div class="glass">
+    <h2>Country Comparison</h2>
+    <p class="note">Monthly % of items mentioning country by source.</p>
+    <div class="btn-group" id="cmp-co-btns"></div>
+    <div class="chart-wrap"><canvas id="cmpCoChart"></canvas></div>
   </div>
 </section>
-
 </main>
-
 <footer>
-  <p>Data: <a href="https://www.1tv.ru">1tv.ru</a> &middot; <a href="http://en.kremlin.ru">kremlin.ru</a> &middot; <a href="https://tass.com">TASS</a> &middot; <a href="https://t.me/s/MFARussia">MFA Telegram</a></p>
-  <p style="margin-top:0.4rem;">Charles Crabtree &middot; Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
-  <p style="margin-top:0.4rem;"><a href="https://github.com/lobsterbush/kremlin-speeches">GitHub</a></p>
+  <p>Data: <a href="https://www.1tv.ru">1tv.ru</a> &middot; <a href="http://en.kremlin.ru">kremlin.ru</a> &middot; <a href="https://tass.com">TASS</a> &middot; <a href="https://t.me/s/MFARussia">MFA Telegram</a> &middot; <a href="https://www.rt.com">RT</a></p>
+  <p style="margin-top:.4rem">Charles Crabtree &middot; Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
+  <p style="margin-top:.4rem"><a href="https://github.com/lobsterbush/kremlin-speeches">GitHub</a></p>
 </footer>
 <button id="btt" title="Back to top">&uarr;</button>
-
 <script>
-/* ── CONSTANTS ── */
-const PALETTE = ['#0066cc','#DC2626','#2A9D8F','#E9C46A','#264653','#F4A261','#7C3AED','#457B9D','#D62828','#023E8A','#9B2226','#059669','#BB3E03','#CA6702','#EE9B00','#94D2BD'];
-const FONT = { family: 'Space Grotesk', size: 11 };
-const GC = () => getComputedStyle(document.body).getPropertyValue('--border-light').trim() || '#eaeaea';
-async function F(p) { return (await fetch(p)).json(); }
+const P=['#0066cc','#DC2626','#2A9D8F','#E9C46A','#264653','#F4A261','#7C3AED','#457B9D','#D62828','#023E8A','#9B2226','#059669','#BB3E03','#CA6702','#EE9B00','#94D2BD'];
+const FONT={family:'Space Grotesk',size:11};
+const GC=()=>getComputedStyle(document.body).getPropertyValue('--border-light').trim()||'#eaeaea';
+async function F(p){return(await fetch(p)).json();}
 
-/* Source config */
-const SOURCES = {
-  '1tv':    { color: '#0066cc', label: '1TV', unit: 'segments', dataDir: 'data', hasCats: true, hasRu: true, desc: 'Channel One <span class="ru">Первый канал</span>', blurb: '144,966 broadcast segment descriptions from Russia\'s largest state broadcaster, machine-translated to English. Classified into 10 categories via supervised learning.' },
-  'kremlin':{ color: '#059669', label: 'Kremlin', unit: 'speeches', dataDir: 'data/kremlin', hasCats: false, hasRu: false, desc: 'Kremlin Speeches <span class="ru">Кремль</span>', blurb: '1,402 prepared ceremonial remarks from en.kremlin.ru (2000-2025). Award ceremonies, state visits, commemorations, and national holidays.' },
-  'tass':   { color: '#DC2626', label: 'TASS', unit: 'articles', dataDir: 'data/tass', hasCats: true, hasRu: false, desc: 'TASS <span class="ru">ТАСС</span>', blurb: 'Full English-language articles from Russia\'s official news agency. TASS distributes the Kremlin\'s narrative to domestic and international outlets.' },
-  'mfa':    { color: '#7C3AED', label: 'MFA', unit: 'messages', dataDir: 'data/mfa', hasCats: false, hasRu: false, desc: 'MFA Telegram <span class="ru">МИД</span>', blurb: 'Messages from the Russian Foreign Ministry\'s English Telegram channel (@MFARussia). Diplomatic statements, bilateral meetings, and policy declarations.' },
+/* Key events for annotations */
+const EVENTS=[
+  {month:'2008-08',label:'Georgia War',color:'#DC2626'},
+  {month:'2014-03',label:'Crimea',color:'#DC2626'},
+  {month:'2015-09',label:'Syria',color:'#F4A261'},
+  {month:'2020-03',label:'COVID',color:'#7C3AED'},
+  {month:'2022-02',label:'Ukraine Invasion',color:'#DC2626'},
+];
+function eventAnnotations(labels){
+  const a={};
+  EVENTS.forEach((e,i)=>{
+    const idx=labels.indexOf(e.month);
+    if(idx===-1)return;
+    a['ev'+i]={type:'line',xMin:idx,xMax:idx,borderColor:e.color+'88',borderWidth:1,borderDash:[4,3],
+      label:{display:true,content:e.label,position:'start',font:{size:9,family:'Space Grotesk'},color:e.color,backgroundColor:'transparent',padding:2}};
+  });
+  return a;
+}
+
+const SOURCES={
+  '1tv':{color:'#0066cc',label:'1TV',unit:'segments',dataDir:'data',hasCats:true,hasRu:true,
+    desc:'Channel One <span class="ru">Первый канал</span>',
+    blurb:'Russia\'s largest state broadcaster. Segment descriptions machine-translated to English, classified into 10 categories.'},
+  'kremlin':{color:'#059669',label:'Kremlin',unit:'speeches',dataDir:'data/kremlin',hasCats:false,hasRu:false,
+    desc:'Kremlin Speeches <span class="ru">Кремль</span>',
+    blurb:'Prepared ceremonial remarks from en.kremlin.ru. Award ceremonies, state visits, commemorations, and national holidays.'},
+  'tass':{color:'#DC2626',label:'TASS',unit:'articles',dataDir:'data/tass',hasCats:true,hasRu:false,
+    desc:'TASS <span class="ru">ТАСС</span>',
+    blurb:'English-language articles from Russia\'s official news agency.'},
+  'mfa':{color:'#7C3AED',label:'MFA',unit:'messages',dataDir:'data/mfa',hasCats:false,hasRu:false,
+    desc:'MFA Telegram <span class="ru">МИД</span>',
+    blurb:'Messages from the Russian Foreign Ministry\'s English Telegram channel (@MFARussia).'},
+  'rt':{color:'#E9C46A',label:'RT',unit:'articles',dataDir:'data/rt',hasCats:true,hasRu:false,
+    desc:'RT <span class="ru">Russia Today</span>',
+    blurb:'English-language articles from Russia\'s international state media network. Russia\'s primary English propaganda outlet.'},
 };
+const SRC_STYLE={
+  '1tv':{color:'#0066cc',dash:[],label:'1TV'},
+  'tass':{color:'#DC2626',dash:[6,3],label:'TASS'},
+  'kremlin':{color:'#059669',dash:[2,3],label:'Kremlin'},
+  'mfa':{color:'#7C3AED',dash:[8,4,2,4],label:'MFA'},
+  'rt':{color:'#E9C46A',dash:[4,2],label:'RT'},
+};
+const srcColors={'1TV':'#0066cc','Kremlin':'#059669','TASS':'#DC2626','MFA':'#7C3AED','RT':'#E9C46A'};
+const srcTabs={'1TV':'1tv','Kremlin':'kremlin','TASS':'tass','MFA':'mfa','RT':'rt'};
 
-/* ── TABS ── */
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
-    const id = t.dataset.tab;
-    if (SOURCES[id] && !window['_init_'+id]) initSourceTab(id);
-    if (id === 'compare' && !window._cmpInit) initCompare();
+/* ── TABS + HASH ROUTING ── */
+function activateTab(id){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  const btn=document.querySelector('[data-tab="'+id+'"]');
+  if(btn)btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  if(SOURCES[id]&&!window['_init_'+id])initSourceTab(id);
+  if(id==='compare'&&!window._cmpInit)initCompare();
+  window.scrollTo({top:0});
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    const id=t.dataset.tab;
+    history.replaceState(null,null,'#'+id);
+    activateTab(id);
   });
 });
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h)activateTab(h);});
 
 /* ── DARK MODE / PROGRESS / BTT ── */
-if (localStorage.getItem('dark')==='1') document.body.classList.add('dark');
-document.getElementById('theme-btn').addEventListener('click', () => {
-  document.body.classList.toggle('dark');
-  localStorage.setItem('dark', document.body.classList.contains('dark')?'1':'0');
+if(localStorage.getItem('dark')==='1')document.body.classList.add('dark');
+document.getElementById('theme-btn').addEventListener('click',()=>{document.body.classList.toggle('dark');localStorage.setItem('dark',document.body.classList.contains('dark')?'1':'0');});
+window.addEventListener('scroll',()=>{
+  const h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('progress').style.width=h>0?(window.scrollY/h*100)+'%':'0%';
+  document.getElementById('btt').classList.toggle('visible',window.scrollY>400);
 });
-window.addEventListener('scroll', () => {
-  const h = document.documentElement.scrollHeight - window.innerHeight;
-  document.getElementById('progress').style.width = h > 0 ? (window.scrollY/h*100)+'%' : '0%';
-  const b = document.getElementById('btt');
-  b.classList.toggle('visible', window.scrollY > 400);
-});
-document.getElementById('btt').addEventListener('click', () => window.scrollTo({top:0,behavior:'smooth'}));
+document.getElementById('btt').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
 
 /* ── CHART HELPERS ── */
-function lineOpts(yLabel) {
-  return {
-    responsive: true, maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
-      y: { beginAtZero: true, grid: { color: GC() }, ticks: { font: FONT },
-        title: { display: true, text: yLabel, font: { ...FONT, size: 12 } } }
+function lineOpts(yLabel,labels){
+  const ann=labels?eventAnnotations(labels):{};
+  return{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},annotation:{annotations:ann}},
+    scales:{
+      x:{ticks:{maxTicksLimit:14,font:FONT},grid:{display:false}},
+      y:{beginAtZero:true,grid:{color:GC()},ticks:{font:FONT},title:{display:true,text:yLabel,font:{...FONT,size:12}}}
     }
   };
 }
 
 /* ══════ OVERVIEW ══════ */
-async function initOverview() {
-  let ovData, volData;
-  try {
-    [ovData, volData] = await Promise.all([
-      F('data/overview/summary.json'), F('data/overview/volume_by_source.json')
-    ]);
-  } catch(e) { return; }
-
-  const box = document.getElementById('ov-source-cards');
-  const srcColors = { '1TV':'#0066cc', 'Kremlin':'#059669', 'TASS':'#DC2626', 'MFA':'#7C3AED' };
-  const srcTabs = { '1TV':'1tv', 'Kremlin':'kremlin', 'TASS':'tass', 'MFA':'mfa' };
-  box.innerHTML = ovData.sources.map(s => `
-    <div class="source-card" style="border-color:${srcColors[s.name]||'#888'}" onclick="document.querySelector('[data-tab=${srcTabs[s.name]}]').click()">
+let ovChart=null,ovVolData=null;
+async function initOverview(){
+  let ovData;
+  try{[ovData,ovVolData]=await Promise.all([F('data/overview/summary.json'),F('data/overview/volume_by_source.json')]);}catch(e){return;}
+  // Last updated
+  if(ovData.last_updated){
+    const d=new Date(ovData.last_updated);
+    document.getElementById('lastUp').textContent='Updated '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+  // Source cards
+  const box=document.getElementById('ov-source-cards');
+  box.innerHTML=ovData.sources.map(s=>`
+    <div class="source-card" style="border-color:${srcColors[s.name]||'#888'}" onclick="location.hash='${srcTabs[s.name]}'">
       <h3>${s.name}</h3>
       <div class="sc-count" style="color:${srcColors[s.name]}">${s.count.toLocaleString()}</div>
       <div class="sc-meta">${s.date_start.slice(0,4)}&ndash;${s.date_end.slice(0,4)}</div>
-    </div>
-  `).join('');
-
-  // Overlaid volume chart
-  const datasets = [];
-  for (const [name, points] of Object.entries(volData)) {
-    const c = srcColors[name] || '#888';
-    datasets.push({
-      label: name, data: points.map(p=>p.count),
-      borderColor: c, backgroundColor: c+'10',
-      fill: false, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
+    </div>`).join('');
+  drawOverviewChart('abs');
+  document.querySelectorAll('#ov-mode button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#ov-mode button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');drawOverviewChart(b.dataset.m);
     });
+  });
+}
+function drawOverviewChart(mode){
+  if(!ovVolData)return;
+  let labels=[];
+  for(const pts of Object.values(ovVolData)){if(pts.length>labels.length)labels=pts.map(p=>p.month);}
+  const ds=[];
+  for(const[name,pts]of Object.entries(ovVolData)){
+    const c=srcColors[name]||'#888';
+    let data;
+    if(mode==='pct'){
+      const totals={};
+      for(const[,pts2]of Object.entries(ovVolData))pts2.forEach(p=>{totals[p.month]=(totals[p.month]||0)+p.count;});
+      data=pts.map(p=>totals[p.month]?Math.round(p.count/totals[p.month]*1000)/10:0);
+    }else{data=pts.map(p=>p.count);}
+    ds.push({label:name,data,borderColor:c,backgroundColor:c+'10',fill:mode==='pct',borderWidth:1.5,pointRadius:0,tension:.3});
   }
-  let labels = [];
-  for (const points of Object.values(volData)) {
-    if (points.length > labels.length) labels = points.map(p=>p.month);
-  }
-  new Chart(document.getElementById('ovVolume'), {
-    type: 'line', data: { labels, datasets },
-    options: {
-      ...lineOpts('Items per month'),
-      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } }
-    }
+  if(ovChart)ovChart.destroy();
+  const yLabel=mode==='pct'?'% share of items':'Items per month';
+  ovChart=new Chart(document.getElementById('ovVolume'),{
+    type:'line',data:{labels,datasets:ds},
+    options:{...lineOpts(yLabel,labels),plugins:{legend:{position:'top',labels:{font:FONT,boxWidth:12}},annotation:{annotations:eventAnnotations(labels)}},
+      ...(mode==='pct'?{scales:{x:{ticks:{maxTicksLimit:14,font:FONT},grid:{display:false}},y:{beginAtZero:true,max:100,grid:{color:GC()},ticks:{font:FONT,callback:v=>v+'%'},title:{display:true,text:yLabel,font:{...FONT,size:12}}}}}:{})}
   });
 }
 
 /* ══════ SOURCE TAB FACTORY ══════ */
-async function initSourceTab(id) {
-  window['_init_'+id] = true;
-  const cfg = SOURCES[id];
-  const dir = cfg.dataDir;
-  let summary, monthly, kwData, coData;
+async function initSourceTab(id){
+  window['_init_'+id]=true;
+  const cfg=SOURCES[id],dir=cfg.dataDir;
+  let summary,monthly,kwData,coData;
+  try{[summary,monthly,kwData,coData]=await Promise.all([F(dir+'/summary.json'),F(dir+'/monthly_volume.json'),F(dir+'/keyword_trends.json'),F(dir+'/country_mentions.json')]);}
+  catch(e){document.getElementById('tab-'+id).innerHTML='<div class="empty-state"><div class="big">&#x26A0;</div>'+cfg.label+' data not available. Run the scraper first.</div>';return;}
 
-  try {
-    [summary, monthly, kwData, coData] = await Promise.all([
-      F(dir+'/summary.json'), F(dir+'/monthly_volume.json'),
-      F(dir+'/keyword_trends.json'), F(dir+'/country_mentions.json'),
-    ]);
-  } catch(e) {
-    document.getElementById('tab-'+id).innerHTML = `<div class="empty-state"><div class="big">&#x26A0;</div>${cfg.label} data not yet available. Run the scraper first.</div>`;
-    return;
-  }
+  const count=summary.total_articles||summary.total_speeches||summary.total_messages||0;
+  const dStart=summary.date_start||'',dEnd=summary.date_end||'',yrs=summary.years_covered||0;
 
-  const count = summary.total_articles || summary.total_speeches || summary.total_messages || 0;
-  const dStart = summary.date_start || '';
-  const dEnd = summary.date_end || '';
-  const yrs = summary.years_covered || 0;
-
-  let html = `
-    <div class="hero-section">
-      <h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">${cfg.desc}</h1>
-      <p class="hero-sub">${cfg.blurb}</p>
-    </div>
+  let html=`<div class="hero-section"><h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">${cfg.desc}</h1>
+    <p class="hero-sub">${cfg.blurb} <strong>${count.toLocaleString()}</strong> ${cfg.unit}, ${dStart.slice(0,4)}&ndash;${dEnd.slice(0,4)}.</p></div>
     <div class="stat-cards" id="${id}-stats"></div>
-    <div class="glass"><h2>Volume</h2><p class="note">${cfg.label} ${cfg.unit} per month</p>
-      <div class="chart-wrap"><canvas id="${id}-vol"></canvas></div></div>`;
+    <div class="glass"><h2>Volume</h2><p class="note">${cfg.label} ${cfg.unit} per month</p><div class="chart-wrap"><canvas id="${id}-vol"></canvas></div></div>`;
+  if(cfg.hasCats&&summary.categories&&summary.categories.length)
+    html+=`<div class="glass"><h2>Categories</h2><p class="note">Breakdown by category</p><div class="chart-wrap" style="max-height:400px"><canvas id="${id}-cats"></canvas></div></div>`;
+  if(summary.presidents&&summary.presidents.length)
+    html+=`<div class="glass"><h2>By President</h2><p class="note">Speeches by presidential term</p><div class="chart-wrap" style="max-height:260px"><canvas id="${id}-pres"></canvas></div></div>`;
+  html+=`<div class="glass"><h2>Keywords</h2><p class="note">% of ${cfg.unit} mentioning keyword per month</p><div class="btn-group" id="${id}-kw-btns"></div><div class="chart-wrap"><canvas id="${id}-kw"></canvas></div></div>
+    <div class="glass"><h2>Countries</h2><p class="note">% of ${cfg.unit} mentioning country per month</p><div class="btn-group" id="${id}-co-btns"></div><div class="chart-wrap"><canvas id="${id}-co"></canvas></div></div>
+    <div class="glass"><h2>Search</h2><p class="note">Search ${count.toLocaleString()} ${cfg.unit}</p>
+    <div class="search-wrap"><div class="search-row"><input type="text" id="${id}-q" placeholder="Search titles..."><select id="${id}-qy"><option value="all">All years</option></select></div>
+    <div class="search-meta"><span id="${id}-rc"></span></div></div><div id="${id}-sr"></div></div>`;
+  document.getElementById('tab-'+id).innerHTML=html;
 
-  if (cfg.hasCats && summary.categories && summary.categories.length) {
-    html += `<div class="glass"><h2>Categories</h2><p class="note">Breakdown by category</p>
-      <div class="chart-wrap" style="max-height:400px"><canvas id="${id}-cats"></canvas></div></div>`;
+  // Stats
+  const stats=[{n:count.toLocaleString(),l:cfg.unit.charAt(0).toUpperCase()+cfg.unit.slice(1)},{n:yrs,l:'Years'},{n:dStart.slice(0,4)+'\u2013'+dEnd.slice(0,4),l:'Date Range'}];
+  if(summary.presidents)stats.push({n:summary.presidents.length,l:'Presidents'});
+  document.getElementById(id+'-stats').innerHTML=stats.map(s=>`<div class="stat-card"><span class="stat-number" style="color:${cfg.color}">${s.n}</span><span class="stat-label">${s.l}</span></div>`).join('');
+
+  // Volume
+  if(monthly.length){
+    const labels=monthly.map(d=>d.month);
+    new Chart(document.getElementById(id+'-vol'),{type:'line',
+      data:{labels,datasets:[{data:monthly.map(d=>d.count),borderColor:cfg.color,backgroundColor:cfg.color+'10',fill:true,borderWidth:1.5,pointRadius:0,tension:.3}]},
+      options:lineOpts(cfg.unit+' per month',labels)});
   }
-  if (summary.presidents && summary.presidents.length) {
-    html += `<div class="glass"><h2>By President</h2><p class="note">Speeches by presidential term</p>
-      <div class="chart-wrap" style="max-height:260px"><canvas id="${id}-pres"></canvas></div></div>`;
+  // Categories
+  if(cfg.hasCats&&summary.categories&&summary.categories.length){
+    const cats=summary.categories,total=cats.reduce((s,c)=>s+c.count,0);
+    new Chart(document.getElementById(id+'-cats'),{type:'bar',
+      data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>c.count),backgroundColor:cats.map((_,i)=>P[i%P.length]),borderWidth:0,borderRadius:4,barPercentage:.75}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.x.toLocaleString()} (${(ctx.parsed.x/total*100).toFixed(1)}%)`}}},
+        scales:{x:{beginAtZero:true,grid:{color:GC()},ticks:{font:FONT,callback:v=>v>=1000?(v/1000)+'K':v}},y:{grid:{display:false},ticks:{font:{family:'Space Grotesk',size:12,weight:500}}}}}});
   }
-
-  html += `
-    <div class="glass"><h2>Keywords</h2><p class="note">% of ${cfg.unit} mentioning keyword per month</p>
-      <div class="btn-group" id="${id}-kw-btns"></div>
-      <div class="chart-wrap"><canvas id="${id}-kw"></canvas></div></div>
-    <div class="glass"><h2>Countries</h2><p class="note">% of ${cfg.unit} mentioning country per month</p>
-      <div class="btn-group" id="${id}-co-btns"></div>
-      <div class="chart-wrap"><canvas id="${id}-co"></canvas></div></div>
-    <div class="glass"><h2>Search</h2>
-      <p class="note">Search ${count.toLocaleString()} ${cfg.unit}</p>
-      <div class="search-wrap"><div class="search-row">
-        <input type="text" id="${id}-q" placeholder="Search titles...">
-        <select id="${id}-qy"><option value="all">All years</option></select>
-      </div><div class="search-meta"><span id="${id}-rc"></span></div></div>
-      <div id="${id}-sr"></div>
-    </div>`;
-
-  document.getElementById('tab-'+id).innerHTML = html;
-
-  // Stat cards
-  const stats = [
-    { n: count.toLocaleString(), l: cfg.unit.charAt(0).toUpperCase()+cfg.unit.slice(1) },
-    { n: yrs, l: 'Years' },
-    { n: dStart.slice(0,4)+'\u2013'+dEnd.slice(0,4), l: 'Date Range' },
-  ];
-  if (summary.presidents) stats.push({ n: summary.presidents.length, l: 'Presidents' });
-  document.getElementById(id+'-stats').innerHTML = stats.map(s =>
-    `<div class="stat-card"><span class="stat-number" style="color:${cfg.color}">${s.n}</span><span class="stat-label">${s.l}</span></div>`
-  ).join('');
-
-  // Volume chart
-  if (monthly.length) {
-    new Chart(document.getElementById(id+'-vol'), {
-      type: 'line',
-      data: { labels: monthly.map(d=>d.month), datasets: [{
-        data: monthly.map(d=>d.count),
-        borderColor: cfg.color, backgroundColor: cfg.color+'10',
-        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3,
-      }]},
-      options: lineOpts(cfg.unit+' per month'),
-    });
+  // Presidents
+  if(summary.presidents&&summary.presidents.length){
+    const pres=summary.presidents;
+    new Chart(document.getElementById(id+'-pres'),{type:'bar',
+      data:{labels:pres.map(p=>p.name),datasets:[{data:pres.map(p=>p.count),backgroundColor:['#059669','#2A9D8F','#264653','#457B9D'],borderWidth:0,borderRadius:4,barPercentage:.65}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.x.toLocaleString()} speeches`}}},
+        scales:{x:{beginAtZero:true,grid:{color:GC()},ticks:{font:FONT}},y:{grid:{display:false},ticks:{font:{family:'Space Grotesk',size:12,weight:500}}}}}});
   }
-
-  // Categories bar
-  if (cfg.hasCats && summary.categories && summary.categories.length) {
-    const cats = summary.categories;
-    const total = cats.reduce((s,c)=>s+c.count,0);
-    new Chart(document.getElementById(id+'-cats'), {
-      type: 'bar',
-      data: { labels: cats.map(c=>c.name), datasets: [{ data: cats.map(c=>c.count),
-        backgroundColor: cats.map((_,i)=>PALETTE[i%PALETTE.length]), borderWidth: 0, borderRadius: 4, barPercentage: 0.75 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} (${(ctx.parsed.x/total*100).toFixed(1)}%)` } } },
-        scales: {
-          x: { beginAtZero: true, grid: { color: GC() }, ticks: { font: FONT, callback: v => v>=1000?(v/1000)+'K':v } },
-          y: { grid: { display: false }, ticks: { font: { family:'Space Grotesk', size:12, weight:500 } } }
-        }
-      }
-    });
-  }
-
-  // Presidents bar
-  if (summary.presidents && summary.presidents.length) {
-    const pres = summary.presidents;
-    new Chart(document.getElementById(id+'-pres'), {
-      type: 'bar',
-      data: { labels: pres.map(p=>p.name), datasets: [{ data: pres.map(p=>p.count),
-        backgroundColor: ['#059669','#2A9D8F','#264653','#457B9D'], borderWidth: 0, borderRadius: 4, barPercentage: 0.65 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString()} speeches` } } },
-        scales: {
-          x: { beginAtZero: true, grid: { color: GC() }, ticks: { font: FONT } },
-          y: { grid: { display: false }, ticks: { font: { family:'Space Grotesk', size:12, weight:500 } } }
-        }
-      }
-    });
-  }
-
-  // Keyword tracker
-  setupToggleChart(id, 'kw', kwData, cfg.color, '% of '+cfg.unit, ['ukraine','military','china']);
-
-  // Country tracker
-  setupToggleChart(id, 'co', coData, cfg.color, '% of '+cfg.unit, ['ukraine','china','united states','syria']);
-
-  // Search
-  setupSearch(id, dir);
+  setupToggleChart(id,'kw',kwData,cfg.color,'% of '+cfg.unit,['ukraine','military','china']);
+  setupToggleChart(id,'co',coData,cfg.color,'% of '+cfg.unit,['ukraine','china','united states','syria']);
+  setupSearch(id,dir);
 }
 
-/* ── TOGGLE CHART (keywords / countries) ── */
-const _tcState = {};
-function setupToggleChart(srcId, kind, data, color, yLabel, defaults) {
-  const key = srcId+'-'+kind;
-  _tcState[key] = { data, chart: null, active: new Set(defaults) };
-  const box = document.getElementById(srcId+'-'+kind+'-btns');
-  Object.keys(data).forEach(k => {
-    const b = document.createElement('button');
-    b.textContent = k;
-    if (_tcState[key].active.has(k)) b.classList.add('active');
-    b.onclick = () => { _tcState[key].active.has(k) ? _tcState[key].active.delete(k) : _tcState[key].active.add(k); b.classList.toggle('active'); drawTC(key, srcId, kind, yLabel); };
-    box.appendChild(b);
-  });
-  drawTC(key, srcId, kind, yLabel);
+/* ── TOGGLE CHART ── */
+const _tc={};
+function setupToggleChart(sid,kind,data,color,yLabel,defaults){
+  const key=sid+'-'+kind;_tc[key]={data,chart:null,active:new Set(defaults)};
+  const box=document.getElementById(sid+'-'+kind+'-btns');
+  Object.keys(data).forEach(k=>{const b=document.createElement('button');b.textContent=k;if(_tc[key].active.has(k))b.classList.add('active');
+    b.onclick=()=>{_tc[key].active.has(k)?_tc[key].active.delete(k):_tc[key].active.add(k);b.classList.toggle('active');drawTC(key,sid,kind,yLabel);};box.appendChild(b);});
+  drawTC(key,sid,kind,yLabel);
+}
+function drawTC(key,sid,kind,yLabel){
+  const st=_tc[key];if(!st||!st.data)return;
+  const fk=Object.keys(st.data)[0];if(!fk||!st.data[fk].length)return;
+  const labels=st.data[fk].map(d=>d.month),ds=[];let ci=0;
+  st.active.forEach(k=>{if(!st.data[k])return;ds.push({label:k,data:st.data[k].map(d=>d.pct),borderColor:P[ci%P.length],borderWidth:1.5,pointRadius:0,tension:.3,fill:false});ci++;});
+  if(st.chart)st.chart.destroy();
+  st.chart=new Chart(document.getElementById(sid+'-'+kind),{type:'line',data:{labels,datasets:ds},
+    options:{...lineOpts(yLabel,labels),plugins:{legend:{position:'top',labels:{font:FONT,boxWidth:12}},annotation:{annotations:eventAnnotations(labels)}},
+      scales:{x:{ticks:{maxTicksLimit:14,font:FONT},grid:{display:false}},y:{beginAtZero:true,grid:{color:GC()},ticks:{font:FONT,callback:v=>v+'%'},title:{display:true,text:yLabel,font:{...FONT,size:12}}}}}});
 }
 
-function drawTC(key, srcId, kind, yLabel) {
-  const st = _tcState[key];
-  if (!st || !st.data) return;
-  const firstKey = Object.keys(st.data)[0];
-  if (!firstKey || !st.data[firstKey].length) return;
-  const labels = st.data[firstKey].map(d=>d.month);
-  const ds = []; let ci = 0;
-  st.active.forEach(k => {
-    if (!st.data[k]) return;
-    ds.push({ label: k, data: st.data[k].map(d=>d.pct), borderColor: PALETTE[ci%PALETTE.length], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false });
-    ci++;
-  });
-  if (st.chart) st.chart.destroy();
-  st.chart = new Chart(document.getElementById(srcId+'-'+kind), {
-    type: 'line', data: { labels, datasets: ds },
-    options: {
-      ...lineOpts(yLabel),
-      plugins: { legend: { position: 'top', labels: { font: FONT, boxWidth: 12 } } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 14, font: FONT }, grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: GC() }, ticks: { font: FONT, callback: v => v+'%' },
-          title: { display: true, text: yLabel, font: { ...FONT, size: 12 } } }
-      }
-    }
-  });
+/* ── SEARCH ── */
+const _sc={};
+function setupSearch(sid,dir){
+  const sd=dir+'/search';
+  F(sd+'/years.json').then(years=>{
+    const sel=document.getElementById(sid+'-qy');years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o);});
+    let timer;const go=()=>{clearTimeout(timer);timer=setTimeout(()=>doSearch(sid,sd),300);};
+    document.getElementById(sid+'-q').addEventListener('input',go);sel.addEventListener('change',go);
+    document.getElementById(sid+'-sr').innerHTML='<div class="empty-state"><div class="big">&#128269;</div>Type at least 2 characters</div>';
+  }).catch(()=>{document.getElementById(sid+'-sr').innerHTML='<div class="empty-state">Search index not available.</div>';});
 }
-
-/* ── PER-SOURCE SEARCH ── */
-const _searchCache = {};
-function setupSearch(srcId, dir) {
-  const searchDir = dir + '/search';
-  F(searchDir+'/years.json').then(years => {
-    const sel = document.getElementById(srcId+'-qy');
-    years.forEach(y => { const o = document.createElement('option'); o.value=y; o.textContent=y; sel.appendChild(o); });
-    let timer = null;
-    const go = () => { clearTimeout(timer); timer = setTimeout(()=>doSearch(srcId, searchDir), 300); };
-    document.getElementById(srcId+'-q').addEventListener('input', go);
-    sel.addEventListener('change', go);
-    document.getElementById(srcId+'-sr').innerHTML = '<div class="empty-state"><div class="big">&#128269;</div>Type at least 2 characters to search</div>';
-  }).catch(() => {
-    document.getElementById(srcId+'-sr').innerHTML = '<div class="empty-state">Search index not available.</div>';
-  });
-}
-
-async function doSearch(srcId, searchDir) {
-  const q = document.getElementById(srcId+'-q').value.trim().toLowerCase();
-  const yf = document.getElementById(srcId+'-qy').value;
-  const out = document.getElementById(srcId+'-sr');
-  const cnt = document.getElementById(srcId+'-rc');
-  if (q.length < 2) { out.innerHTML = '<div class="empty-state"><div class="big">&#128269;</div>Type at least 2 characters</div>'; cnt.textContent=''; return; }
-  out.innerHTML = '<div class="empty-state">Searching...</div>';
-
-  const cacheKey = srcId;
-  if (!_searchCache[cacheKey]) _searchCache[cacheKey] = {};
-  async function loadY(y) {
-    if (_searchCache[cacheKey][y]) return _searchCache[cacheKey][y];
-    const d = await F(searchDir+'/'+y+'.json');
-    _searchCache[cacheKey][y] = d;
-    return d;
-  }
-
+async function doSearch(sid,sd){
+  const q=document.getElementById(sid+'-q').value.trim().toLowerCase(),yf=document.getElementById(sid+'-qy').value;
+  const out=document.getElementById(sid+'-sr'),cnt=document.getElementById(sid+'-rc');
+  if(q.length<2){out.innerHTML='<div class="empty-state"><div class="big">&#128269;</div>Type at least 2 characters</div>';cnt.textContent='';return;}
+  out.innerHTML='<div class="loading">Searching</div>';
+  if(!_sc[sid])_sc[sid]={};
+  async function loadY(y){if(_sc[sid][y])return _sc[sid][y];const d=await F(sd+'/'+y+'.json');_sc[sid][y]=d;return d;}
   let articles;
-  if (yf === 'all') {
-    const years = await F(searchDir+'/years.json');
-    articles = (await Promise.all(years.map(loadY))).flat();
-  } else {
-    articles = await loadY(yf);
-  }
-
-  const matches = articles.filter(a => {
-    const t = a.t.toLowerCase();
-    const r = (a.r||'').toLowerCase();
-    const s = (a.s||'').toLowerCase();
-    return t.includes(q) || r.includes(q) || s.includes(q);
-  });
-  const shown = matches.slice(0, 100);
-  cnt.textContent = `${matches.length.toLocaleString()} results${matches.length>100?' (first 100)':''}`;
-  if (shown.length === 0) {
-    out.innerHTML = '<div class="empty-state"><div class="big">&#x2205;</div>No results found</div>';
-    return;
-  }
-  out.innerHTML = shown.map(a => {
-    const hl = (text,q) => { if (!text) return ''; const i=text.toLowerCase().indexOf(q); return i===-1?text:text.slice(0,i)+'<strong>'+text.slice(i,i+q.length)+'</strong>'+text.slice(i+q.length); };
-    return `<div class="result-item">
-      <span class="en-title">${hl(a.t,q)}</span>
-      ${a.r ? `<span class="ru-title">${hl(a.r,q)}</span>` : ''}
-      ${a.s ? `<span class="snippet">${hl(a.s,q)}${a.s.length>=118?'...':''}</span>` : ''}
-      <div class="result-meta">
-        <span>${a.d}</span>
-        ${a.cat ? `<span class="cat-badge">${a.cat}</span>` : ''}
-        ${a.wc ? `<span>${a.wc} words</span>` : ''}
-        ${a.u ? `<a href="${a.u}" target="_blank" style="color:var(--accent)">source &#x2197;</a>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  if(yf==='all'){const years=await F(sd+'/years.json');articles=(await Promise.all(years.map(loadY))).flat();}else{articles=await loadY(yf);}
+  const matches=articles.filter(a=>{const t=a.t.toLowerCase(),r=(a.r||'').toLowerCase(),s=(a.s||'').toLowerCase();return t.includes(q)||r.includes(q)||s.includes(q);});
+  const shown=matches.slice(0,100);
+  cnt.textContent=matches.length.toLocaleString()+' results'+(matches.length>100?' (first 100)':'');
+  if(!shown.length){out.innerHTML='<div class="empty-state"><div class="big">&#x2205;</div>No results</div>';return;}
+  const hl=(t,q)=>{if(!t)return'';const i=t.toLowerCase().indexOf(q);return i===-1?t:t.slice(0,i)+'<strong>'+t.slice(i,i+q.length)+'</strong>'+t.slice(i+q.length);};
+  out.innerHTML=shown.map(a=>`<div class="result-item"><span class="en-title">${hl(a.t,q)}</span>${a.r?`<span class="ru-title">${hl(a.r,q)}</span>`:''}${a.s?`<span class="snippet">${hl(a.s,q)}${a.s.length>=118?'...':''}</span>`:''}
+    <div class="result-meta"><span>${a.d}</span>${a.cat?`<span class="cat-badge">${a.cat}</span>`:''}${a.wc?`<span>${a.wc} words</span>`:''}${a.u?`<a href="${a.u}" target="_blank" style="color:var(--accent)">source &#x2197;</a>`:''}</div></div>`).join('');
 }
 
 /* ══════ COMPARE ══════ */
-let cmpData = null, cmpChart = null;
-const activeCmpKW = new Set(['ukraine','sanctions']);
-const SRC_STYLE = {
-  '1tv':    { color:'#0066cc', dash:[], label:'1TV' },
-  'tass':   { color:'#DC2626', dash:[6,3], label:'TASS' },
-  'kremlin':{ color:'#059669', dash:[2,3], label:'Kremlin' },
-  'mfa':    { color:'#7C3AED', dash:[8,4,2,4], label:'MFA' },
-};
-
-async function initCompare() {
-  window._cmpInit = true;
-  try { cmpData = await F('data/compare/keyword_comparison.json'); } catch(e) {
-    document.getElementById('cmp-kw-btns').innerHTML='<div class="empty-state">No comparison data.</div>'; return;
-  }
-  const box = document.getElementById('cmp-kw-btns');
-  Object.keys(cmpData).forEach(kw => {
-    const b = document.createElement('button'); b.textContent = kw;
-    if (activeCmpKW.has(kw)) b.classList.add('active');
-    b.onclick = () => { activeCmpKW.has(kw)?activeCmpKW.delete(kw):activeCmpKW.add(kw); b.classList.toggle('active'); drawCmp(); };
-    box.appendChild(b);
-  });
-  drawCmp();
+let cmpKwData=null,cmpCoData=null,cmpKwChart=null,cmpCoChart=null;
+const activeKW=new Set(['ukraine','sanctions']),activeCO=new Set(['ukraine','china']);
+async function initCompare(){
+  window._cmpInit=true;
+  try{[cmpKwData,cmpCoData]=await Promise.all([F('data/compare/keyword_comparison.json'),F('data/compare/country_comparison.json')]);}
+  catch(e){document.getElementById('cmp-kw-btns').innerHTML='<div class="empty-state">No comparison data.</div>';return;}
+  setupCmpBtns('cmp-kw-btns',cmpKwData,activeKW,drawCmpKw);
+  setupCmpBtns('cmp-co-btns',cmpCoData,activeCO,drawCmpCo);
+  drawCmpKw();drawCmpCo();
 }
-
-function drawCmp() {
-  if (!cmpData) return;
-  const ds = []; let labels = [];
-  activeCmpKW.forEach(kw => {
-    const entry = cmpData[kw]; if (!entry) return;
-    for (const [src, points] of Object.entries(entry)) {
-      if (points.length > labels.length) labels = points.map(d=>d.month);
-      const s = SRC_STYLE[src] || {color:'#888',dash:[],label:src};
-      ds.push({ label:`${kw} (${s.label})`, data:points.map(d=>d.pct),
-        borderColor:s.color, borderDash:s.dash, borderWidth:1.5, pointRadius:0, tension:0.3, fill:false });
-    }
-  });
-  if (cmpChart) cmpChart.destroy();
-  cmpChart = new Chart(document.getElementById('cmpChart'), {
-    type:'line', data:{labels,datasets:ds},
-    options: {
-      ...lineOpts('% of items'),
-      plugins: { legend: { position:'top', labels:{font:FONT,boxWidth:12} } },
-      scales: {
-        x: { ticks:{maxTicksLimit:14,font:FONT}, grid:{display:false} },
-        y: { beginAtZero:true, grid:{color:GC()}, ticks:{font:FONT,callback:v=>v+'%'},
-          title:{display:true,text:'% of items',font:{...FONT,size:12}} }
-      }
-    }
-  });
+function setupCmpBtns(boxId,data,activeSet,drawFn){
+  const box=document.getElementById(boxId);
+  Object.keys(data).forEach(k=>{const b=document.createElement('button');b.textContent=k;if(activeSet.has(k))b.classList.add('active');
+    b.onclick=()=>{activeSet.has(k)?activeSet.delete(k):activeSet.add(k);b.classList.toggle('active');drawFn();};box.appendChild(b);});
 }
+function drawCmpGeneric(data,activeSet,canvasId,existingChart){
+  if(!data)return null;const ds=[];let labels=[];
+  activeSet.forEach(item=>{const entry=data[item];if(!entry)return;
+    for(const[src,pts]of Object.entries(entry)){if(pts.length>labels.length)labels=pts.map(d=>d.month);
+      const s=SRC_STYLE[src]||{color:'#888',dash:[],label:src};
+      ds.push({label:`${item} (${s.label})`,data:pts.map(d=>d.pct),borderColor:s.color,borderDash:s.dash,borderWidth:1.5,pointRadius:0,tension:.3,fill:false});}});
+  if(existingChart)existingChart.destroy();
+  return new Chart(document.getElementById(canvasId),{type:'line',data:{labels,datasets:ds},
+    options:{...lineOpts('% of items',labels),plugins:{legend:{position:'top',labels:{font:FONT,boxWidth:12}},annotation:{annotations:eventAnnotations(labels)}},
+      scales:{x:{ticks:{maxTicksLimit:14,font:FONT},grid:{display:false}},y:{beginAtZero:true,grid:{color:GC()},ticks:{font:FONT,callback:v=>v+'%'},title:{display:true,text:'% of items',font:{...FONT,size:12}}}}}});
+}
+function drawCmpKw(){cmpKwChart=drawCmpGeneric(cmpKwData,activeKW,'cmpKwChart',cmpKwChart);}
+function drawCmpCo(){cmpCoChart=drawCmpGeneric(cmpCoData,activeCO,'cmpCoChart',cmpCoChart);}
 
 /* ── INIT ── */
-initOverview();
+initOverview().then(()=>{const h=location.hash.slice(1);if(h&&h!=='overview')activateTab(h);});
 </script>
 </body>
 </html>

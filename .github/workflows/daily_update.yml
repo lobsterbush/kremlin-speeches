@@ -59,6 +59,10 @@ jobs:
         run: |
           python3 scrape_mfa_telegram.py --max 200
 
+      - name: Run RT RSS scrape
+        run: |
+          python3 scrape_rt.py --mode rss
+
       - name: Regenerate dashboard data
         run: |
           python3 preprocess_dashboard.py
@@ -70,7 +74,8 @@ jobs:
              ! git diff --quiet 1tv_news_2000_2026_translated.csv 2>/dev/null || \
              ! git diff --quiet 1tv_news_classified.csv 2>/dev/null || \
              ! git diff --quiet tass_articles.csv 2>/dev/null || \
-             ! git diff --quiet mfa_telegram.csv 2>/dev/null; then
+             ! git diff --quiet mfa_telegram.csv 2>/dev/null || \
+             ! git diff --quiet rt_articles.csv 2>/dev/null; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
@@ -80,7 +85,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TODAY=$(date -u +%Y-%m-%d)
-          git add docs/ 1tv_news_2000_2026_translated.csv 1tv_news_classified.csv tass_articles.csv mfa_telegram.csv
+          git add docs/ 1tv_news_2000_2026_translated.csv 1tv_news_classified.csv tass_articles.csv mfa_telegram.csv rt_articles.csv
           git commit -m "Auto-update: multi-source data for ${TODAY}
 
           Co-Authored-By: Oz <oz-agent@warp.dev>"
