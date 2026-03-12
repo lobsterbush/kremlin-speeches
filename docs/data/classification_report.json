@@ -1,0 +1,69 @@
+{
+  "cv_accuracy": 0.782,
+  "n_labeled": 2500,
+  "n_unlabeled": 142466,
+  "n_categories": 10,
+  "mean_confidence": 0.4306,
+  "per_class": {
+    "Culture": {
+      "precision": 0.764,
+      "recall": 0.862,
+      "f1": 0.81,
+      "support": 470
+    },
+    "Economy": {
+      "precision": 0.728,
+      "recall": 0.818,
+      "f1": 0.77,
+      "support": 379
+    },
+    "Health": {
+      "precision": 0.96,
+      "recall": 0.949,
+      "f1": 0.954,
+      "support": 275
+    },
+    "Incidents": {
+      "precision": 0.588,
+      "recall": 0.644,
+      "f1": 0.614,
+      "support": 73
+    },
+    "Moscow": {
+      "precision": 0.637,
+      "recall": 0.563,
+      "f1": 0.598,
+      "support": 231
+    },
+    "Politics": {
+      "precision": 0.814,
+      "recall": 0.782,
+      "f1": 0.797,
+      "support": 476
+    },
+    "Society": {
+      "precision": 0.273,
+      "recall": 0.043,
+      "f1": 0.074,
+      "support": 70
+    },
+    "Sports": {
+      "precision": 0.886,
+      "recall": 0.906,
+      "f1": 0.896,
+      "support": 318
+    },
+    "Weather": {
+      "precision": 0.714,
+      "recall": 0.865,
+      "f1": 0.782,
+      "support": 133
+    },
+    "World": {
+      "precision": 0.706,
+      "recall": 0.32,
+      "f1": 0.44,
+      "support": 75
+    }
+  }
+}

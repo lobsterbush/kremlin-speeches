@@ -64,6 +64,148 @@ COUNTRY_DISPLAY = [
     "georgia", "iran", "israel", "poland", "kazakhstan",
 ]
 
+# ── Unified Category Taxonomy ──────────────────────────────────────────────────
+
+UNIFIED_CATEGORIES = [
+    "Politics & Government",
+    "Economy & Business",
+    "Military & Security",
+    "International Affairs",
+    "Society & Culture",
+    "Science & Health",
+    "Sports",
+]
+
+# 1TV native category → unified
+OTV_CATEGORY_MAP = {
+    "Economy": "Economy & Business",
+    "Culture": "Society & Culture",
+    "Politics": "Politics & Government",
+    "Sports": "Sports",
+    "Moscow": "Society & Culture",
+    "Incidents": "Military & Security",
+    "World": "International Affairs",
+    "Weather": "Society & Culture",
+    "Health": "Science & Health",
+    "Society": "Society & Culture",
+}
+
+# TASS native category → unified
+TASS_CATEGORY_MAP = {
+    "world": "International Affairs",
+    "politics": "Politics & Government",
+    "economy": "Economy & Business",
+    "defense": "Military & Security",
+    "society": "Society & Culture",
+    "sports": "Sports",
+    "emergencies": "Military & Security",
+    "science": "Science & Health",
+    "pressreview": "Politics & Government",
+    "russia": "Politics & Government",
+}
+
+# RT section-based category → unified (geographic sections use keyword fallback)
+RT_CATEGORY_MAP = {
+    "business": "Economy & Business",
+    "sport": "Sports",
+    "pop-culture": "Society & Culture",
+    "op-ed": "Politics & Government",
+}
+RT_GEO_SECTIONS = {"news", "russia", "usa", "uk", "africa", "india"}
+
+# Keyword rules for classification (checked in priority order)
+KEYWORD_RULES = [
+    ("Military & Security", [
+        "military", "army", "soldier", "weapon", "missile", "drone",
+        "defense", "defence", "nato", "war ", "combat", "troops",
+        "attack", "bomb", "artillery", "tank ", "navy",
+        "nuclear", "warhead", "battalion", "brigade", "special operation",
+        "terrorist", "terrorism", "extremis", "ceasefire", "offensive",
+        "frontline", "armed force",
+    ]),
+    ("Economy & Business", [
+        "economy", "economic", "gdp", "inflation", "trade", "export",
+        "import", "sanction", "tariff", "oil ", "gas ", "energy",
+        "ruble", "rouble", "bank", "finance", "invest", "market",
+        "business", "company", "corporation", "stock",
+        "budget", "debt", "growth", "recession",
+    ]),
+    ("Science & Health", [
+        "science", "scientist", "research", "space ", "roscosmos",
+        "satellite", "technology", "innovation", "artificial intelligence",
+        "covid", "pandemic", "vaccine", "health", "hospital", "medical",
+        "disease", "virus", "pharma",
+    ]),
+    ("Sports", [
+        "sport", "football", "soccer", "hockey", "olympic",
+        "championship", "tournament", "athlete", "medal", "fifa",
+        "league", "coach",
+    ]),
+    ("International Affairs", [
+        "diplomat", "embassy", "summit", "bilateral", "multilateral",
+        "united nations", "treaty", "foreign minister", "foreign affair",
+        "international", "g20 ", "brics", "shanghai cooperation",
+    ]),
+    ("Society & Culture", [
+        "culture", "cultural", "museum", "film ", "movie",
+        "music", "theater", "theatre", "education", "school",
+        "university", "religion", "church", "orthodox", "mosque",
+        "holiday", "festival", "tradition", "heritage",
+        "demograph", "population", "migration",
+    ]),
+    ("Politics & Government", [
+        "president", "putin", "government", "parliament", "duma",
+        "election", "vote", "governor", "minister", "decree",
+        "legislation", "law ", "policy", "political",
+        "kremlin", "federation council",
+    ]),
+]
+
+
+def classify_by_keywords(text: str) -> str:
+    """Classify text into unified category using keyword matching."""
+    if not text:
+        return "Politics & Government"
+    text_lower = str(text).lower()
+    scores = {}
+    for cat, keywords in KEYWORD_RULES:
+        score = sum(1 for kw in keywords if kw in text_lower)
+        if score > 0:
+            scores[cat] = score
+    if scores:
+        return max(scores, key=scores.get)
+    return "Politics & Government"
+
+
+def apply_unified_categories(df: pd.DataFrame, source: str) -> pd.DataFrame:
+    """Add unified_category column based on source type."""
+    if source == "1tv":
+        col = "category_label" if "category_label" in df.columns else "category_clean"
+        if col in df.columns:
+            df["unified_category"] = df[col].map(OTV_CATEGORY_MAP).fillna("Society & Culture")
+        else:
+            df["unified_category"] = df["text"].apply(classify_by_keywords)
+    elif source == "tass":
+        if "category" in df.columns:
+            df["unified_category"] = df["category"].map(TASS_CATEGORY_MAP).fillna(
+                df["text"].apply(classify_by_keywords)
+            )
+        else:
+            df["unified_category"] = df["text"].apply(classify_by_keywords)
+    elif source == "rt":
+        if "category" in df.columns:
+            mapped = df["category"].map(RT_CATEGORY_MAP)
+            geo_mask = df["category"].isin(RT_GEO_SECTIONS) | mapped.isna()
+            df["unified_category"] = mapped
+            df.loc[geo_mask, "unified_category"] = (
+                df.loc[geo_mask, "text"].apply(classify_by_keywords)
+            )
+        else:
+            df["unified_category"] = df["text"].apply(classify_by_keywords)
+    elif source in ("kremlin", "mfa"):
+        df["unified_category"] = df["text"].apply(classify_by_keywords)
+    return df
+
 
 def load_data() -> pd.DataFrame:
     """Load classified CSV (with predicted categories)."""
@@ -77,6 +219,7 @@ def load_data() -> pd.DataFrame:
         + " "
         + df["content_en"].fillna("").astype(str)
     ).str.lower()
+    df = apply_unified_categories(df, "1tv")
     return df
 
 
@@ -184,7 +327,7 @@ def search_shards(df: pd.DataFrame) -> None:
         content_col="content_en",
         date_col="date_extracted",
         url_col="url",
-        cat_col="category_label",
+        cat_col="unified_category",
     )
 
 
@@ -252,9 +395,9 @@ def summary_stats(df: pd.DataFrame) -> None:
             df["content_en"].astype(str).str.split().str.len().sum() / 1_000_000, 1
         ),
     }
-    # Category distribution
-    if "category_clean" in df.columns:
-        cats = df["category_clean"].value_counts()
+    # Unified category distribution
+    if "unified_category" in df.columns:
+        cats = df["unified_category"].value_counts()
         stats["categories"] = [
             {"name": str(c), "count": int(n)} for c, n in cats.items()
         ]
@@ -282,6 +425,7 @@ def load_kremlin_speeches() -> pd.DataFrame:
         + " "
         + df["content"].fillna("").astype(str)
     ).str.lower()
+    df = apply_unified_categories(df, "kremlin")
     return df
 
 
@@ -303,6 +447,8 @@ def kremlin_stats(df: pd.DataFrame) -> None:
         .reset_index()
         .rename(columns={"index": "location", "location": "name", "count": "count"})
     )
+    # Unified categories
+    cats = df["unified_category"].value_counts() if "unified_category" in df.columns else pd.Series(dtype=int)
     stats = {
         "total_speeches": len(df),
         "date_start": str(df["date"].min().date()) if len(df) else "",
@@ -318,6 +464,9 @@ def kremlin_stats(df: pd.DataFrame) -> None:
             {"name": str(r.get("name", r.get("location", ""))),
              "count": int(r["count"])}
             for _, r in top_locations.iterrows()
+        ],
+        "categories": [
+            {"name": str(c), "count": int(n)} for c, n in cats.items()
         ],
     }
     (kr_dir / "summary.json").write_text(json.dumps(stats))
@@ -373,7 +522,7 @@ def kremlin_stats(df: pd.DataFrame) -> None:
     _generic_search_shards(
         df, kr_dir / "search",
         title_col="title", content_col="content",
-        url_col="url",
+        url_col="url", cat_col="unified_category",
     )
 
 
@@ -395,6 +544,7 @@ def load_tass() -> pd.DataFrame:
         + " "
         + df["lead"].fillna("").astype(str)
     ).str.lower()
+    df = apply_unified_categories(df, "tass")
     return df
 
 
@@ -412,8 +562,8 @@ def tass_stats(df: pd.DataFrame) -> None:
         "avg_content_len": round(df["content"].astype(str).str.len().mean(), 0),
         "categories": [
             {"name": str(c), "count": int(n)}
-            for c, n in df["category"].value_counts().items()
-        ],
+            for c, n in df["unified_category"].value_counts().items()
+        ] if "unified_category" in df.columns else [],
     }
     (tass_dir / "summary.json").write_text(json.dumps(stats))
     print(f"  tass/summary.json: {stats['total_articles']} articles")
@@ -468,7 +618,7 @@ def tass_stats(df: pd.DataFrame) -> None:
     _generic_search_shards(
         df, tass_dir / "search",
         title_col="title", content_col="content",
-        url_col="url", cat_col="category",
+        url_col="url", cat_col="unified_category",
     )
 
 
@@ -525,6 +675,7 @@ def load_mfa() -> pd.DataFrame:
     df["year"] = df["date"].dt.year
     df["month"] = df["date"].dt.to_period("M").astype(str)
     df["text"] = df["text"].fillna("").astype(str).str.lower()
+    df = apply_unified_categories(df, "mfa")
     return df
 
 
@@ -533,12 +684,17 @@ def mfa_stats(df: pd.DataFrame) -> None:
     mfa_dir = DATA_DIR / "mfa"
     mfa_dir.mkdir(parents=True, exist_ok=True)
 
+    # Unified categories
+    cats = df["unified_category"].value_counts() if "unified_category" in df.columns else pd.Series(dtype=int)
     stats = {
         "total_messages": len(df),
         "date_start": str(df["date"].min().date()) if len(df) else "",
         "date_end": str(df["date"].max().date()) if len(df) else "",
         "years_covered": int(df["year"].nunique()),
         "avg_text_len": round(df["text"].str.len().mean(), 0),
+        "categories": [
+            {"name": str(c), "count": int(n)} for c, n in cats.items()
+        ],
     }
     (mfa_dir / "summary.json").write_text(json.dumps(stats))
     print(f"  mfa/summary.json: {stats['total_messages']} messages")
@@ -593,6 +749,7 @@ def mfa_stats(df: pd.DataFrame) -> None:
     _generic_search_shards(
         df, mfa_dir / "search",
         title_col="text", content_col="text",
+        cat_col="unified_category",
     )
 
 
@@ -614,6 +771,7 @@ def load_rt() -> pd.DataFrame:
         + " "
         + df["lead"].fillna("").astype(str)
     ).str.lower()
+    df = apply_unified_categories(df, "rt")
     return df
 
 
@@ -630,8 +788,8 @@ def rt_stats(df: pd.DataFrame) -> None:
         "avg_content_len": round(df["content"].astype(str).str.len().mean(), 0),
         "categories": [
             {"name": str(c), "count": int(n)}
-            for c, n in df["category"].value_counts().items()
-        ],
+            for c, n in df["unified_category"].value_counts().items()
+        ] if "unified_category" in df.columns else [],
     }
     (rt_dir / "summary.json").write_text(json.dumps(stats))
     print(f"  rt/summary.json: {stats['total_articles']} articles")
@@ -686,7 +844,7 @@ def rt_stats(df: pd.DataFrame) -> None:
     _generic_search_shards(
         df, rt_dir / "search",
         title_col="title", content_col="content",
-        url_col="url", cat_col="category",
+        url_col="url", cat_col="unified_category",
     )
 
 
@@ -727,6 +885,29 @@ def overview_summary(
         ]
     (overview_dir / "volume_by_source.json").write_text(json.dumps(combined))
     print(f"  overview/volume_by_source.json: {len(combined)} sources")
+
+
+def cross_source_category_comparison(
+    sources: list,
+) -> None:
+    """Generate cross-source unified category comparison data."""
+    compare_dir = DATA_DIR / "compare"
+    compare_dir.mkdir(parents=True, exist_ok=True)
+
+    results = {}
+    for label, df in sources:
+        if df is None or len(df) == 0:
+            continue
+        if "unified_category" not in df.columns:
+            continue
+        cats = df["unified_category"].value_counts()
+        total = len(df)
+        results[label] = [
+            {"name": str(c), "count": int(n), "pct": round(n / total * 100, 1)}
+            for c, n in cats.items()
+        ]
+    (compare_dir / "category_comparison.json").write_text(json.dumps(results))
+    print(f"  compare/category_comparison.json: {len(results)} sources")
 
 
 def cross_source_country_comparison(
@@ -821,6 +1002,9 @@ def main():
 
     print("\nGenerating cross-source country comparison:")
     cross_source_country_comparison(all_sources)
+
+    print("\nGenerating cross-source category comparison:")
+    cross_source_category_comparison(all_sources)
 
     print("\nGenerating overview:")
     overview_summary({
