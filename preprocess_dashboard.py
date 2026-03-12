@@ -113,76 +113,108 @@ RT_CATEGORY_MAP = {
 }
 RT_GEO_SECTIONS = {"news", "russia", "usa", "uk", "africa", "india"}
 
-# Keyword rules for classification (checked in priority order)
+# Keyword rules for classification (checked in priority order).
+# All keywords use proper word boundaries via precompiled regex.
 KEYWORD_RULES = [
     ("Military & Security", [
         "military", "army", "soldier", "weapon", "missile", "drone",
-        "defense", "defence", "nato", "war ", "combat", "troops",
-        "attack", "bomb", "artillery", "tank ", "navy",
+        "defense", "defence", "nato", "war", "combat", "troops",
+        "attack", "bomb", "artillery", "tank", "navy",
         "nuclear", "warhead", "battalion", "brigade", "special operation",
         "terrorist", "terrorism", "extremis", "ceasefire", "offensive",
-        "frontline", "armed force",
+        "frontline", "armed force", "airstr", "shell", "sniper",
+        "incursion", "invasion", "deployment", "airstrike",
     ]),
     ("Economy & Business", [
         "economy", "economic", "gdp", "inflation", "trade", "export",
-        "import", "sanction", "tariff", "oil ", "gas ", "energy",
+        "import", "sanction", "tariff", "oil", "gas", "energy",
         "ruble", "rouble", "bank", "finance", "invest", "market",
         "business", "company", "corporation", "stock",
-        "budget", "debt", "growth", "recession",
+        "budget", "debt", "growth", "recession", "pipeline",
     ]),
     ("Science & Health", [
-        "science", "scientist", "research", "space ", "roscosmos",
+        "science", "scientist", "research", "space", "roscosmos",
         "satellite", "technology", "innovation", "artificial intelligence",
         "covid", "pandemic", "vaccine", "health", "hospital", "medical",
-        "disease", "virus", "pharma",
+        "disease", "virus", "pharma", "climate",
     ]),
     ("Sports", [
         "sport", "football", "soccer", "hockey", "olympic",
         "championship", "tournament", "athlete", "medal", "fifa",
-        "league", "coach",
+        "league", "coach", "doping", "wada",
     ]),
     ("International Affairs", [
         "diplomat", "embassy", "summit", "bilateral", "multilateral",
         "united nations", "treaty", "foreign minister", "foreign affair",
-        "international", "g20 ", "brics", "shanghai cooperation",
+        "international", "g20", "brics", "shanghai cooperation",
+        "visit", "state visit", "cooperation", "partnership",
+        "delegation", "envoy", "ambassador", "consulate",
+        "cis", "commonwealth", "eurasian", "eaeu", "csto",
+        "african union", "asean", "apec", "sco",
     ]),
     ("Society & Culture", [
-        "culture", "cultural", "museum", "film ", "movie",
+        "culture", "cultural", "museum", "film", "movie",
         "music", "theater", "theatre", "education", "school",
         "university", "religion", "church", "orthodox", "mosque",
         "holiday", "festival", "tradition", "heritage",
-        "demograph", "population", "migration",
+        "demograph", "population", "migration", "humanitarian",
     ]),
     ("Politics & Government", [
         "president", "putin", "government", "parliament", "duma",
         "election", "vote", "governor", "minister", "decree",
-        "legislation", "law ", "policy", "political",
+        "legislation", "law", "policy", "political",
         "kremlin", "federation council",
     ]),
 ]
 
+# Precompile one regex per category for proper word-boundary matching.
+# Each pattern matches any of its keywords with \b boundaries.
+_KEYWORD_PATTERNS = []
+for _cat, _kws in KEYWORD_RULES:
+    _pat = re.compile(
+        r"\b(" + "|".join(re.escape(kw) for kw in _kws) + r")\b",
+        re.IGNORECASE,
+    )
+    _KEYWORD_PATTERNS.append((_cat, _pat, len(_kws)))
+
 
 def classify_by_keywords(text: str) -> str:
-    """Classify text into unified category using keyword matching."""
+    """Classify text into unified category using precompiled regex patterns."""
     if not text:
         return "Politics & Government"
-    text_lower = str(text).lower()
+    text_str = str(text)
     scores = {}
-    for cat, keywords in KEYWORD_RULES:
-        score = sum(1 for kw in keywords if kw in text_lower)
-        if score > 0:
-            scores[cat] = score
+    for cat, pattern, _ in _KEYWORD_PATTERNS:
+        matches = pattern.findall(text_str)
+        if matches:
+            # Count distinct keyword hits (not total occurrences)
+            scores[cat] = len(set(m.lower() for m in matches))
     if scores:
         return max(scores, key=scores.get)
     return "Politics & Government"
+
+
+# Confidence threshold: 1TV articles below this use keyword fallback
+OTV_CONFIDENCE_THRESHOLD = 0.35
 
 
 def apply_unified_categories(df: pd.DataFrame, source: str) -> pd.DataFrame:
     """Add unified_category column based on source type."""
     if source == "1tv":
         col = "category_label" if "category_label" in df.columns else "category_clean"
+        conf_col = "pred_confidence"
         if col in df.columns:
+            # Map native categories to unified
             df["unified_category"] = df[col].map(OTV_CATEGORY_MAP).fillna("Society & Culture")
+            # Hybrid: use keyword classifier for low-confidence predictions
+            if conf_col in df.columns:
+                low_conf = df[conf_col] < OTV_CONFIDENCE_THRESHOLD
+                n_low = low_conf.sum()
+                if n_low > 0:
+                    df.loc[low_conf, "unified_category"] = (
+                        df.loc[low_conf, "text"].apply(classify_by_keywords)
+                    )
+                    print(f"  1TV hybrid: {n_low:,} low-confidence items reclassified by keywords")
         else:
             df["unified_category"] = df["text"].apply(classify_by_keywords)
     elif source == "tass":
@@ -341,7 +373,10 @@ def _generic_search_shards(
     cat_col: str = None,
     title_ru_col: str = None,
 ) -> None:
-    """Year-sharded search index usable by any source."""
+    """Year-sharded search index usable by any source.
+
+    Optimised for size: no word count, 60-char snippets, empty fields omitted.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
 
     years_with_data = []
@@ -354,28 +389,32 @@ def _generic_search_shards(
             if not title:
                 continue
             content = str(r.get(content_col, "")) if pd.notna(r.get(content_col)) else ""
-            wc = len(content.split()) if content else 0
             date_val = r.get(date_col, r.get("date", ""))
             date_str = str(date_val)[:10] if pd.notna(date_val) else ""
             url_val = r.get(url_col, "")
             rec = {
-                "t": title[:150],
+                "t": title[:120],
                 "d": date_str,
-                "u": str(url_val) if pd.notna(url_val) else "",
-                "s": content[:120],
-                "wc": wc,
             }
+            url_str = str(url_val) if pd.notna(url_val) else ""
+            if url_str:
+                rec["u"] = url_str
+            snippet = content[:60]
+            if snippet:
+                rec["s"] = snippet
             if title_ru_col:
                 ru = str(r.get(title_ru_col, "")) if pd.notna(r.get(title_ru_col)) else ""
                 if ru:
-                    rec["r"] = ru[:150]
+                    rec["r"] = ru[:100]
             if cat_col:
                 cat = str(r.get(cat_col, "")) if pd.notna(r.get(cat_col)) else ""
                 if cat:
                     rec["cat"] = cat
             records.append(rec)
         yr = str(int(year))
-        (out_dir / f"{yr}.json").write_text(json.dumps(records, ensure_ascii=False))
+        (out_dir / f"{yr}.json").write_text(
+            json.dumps(records, ensure_ascii=False, separators=(",", ":")),
+        )
         years_with_data.append(yr)
         total += len(records)
     (out_dir / "years.json").write_text(json.dumps(years_with_data))
@@ -762,6 +801,11 @@ def load_rt() -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.read_csv(path, low_memory=False)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    # Drop rows with unparseable dates (9.7% — sitemap entries without lastmod)
+    n_nat = df["date"].isna().sum()
+    if n_nat > 0:
+        print(f"  RT: dropping {n_nat} articles with missing dates")
+        df = df.dropna(subset=["date"]).reset_index(drop=True)
     df["year"] = df["date"].dt.year
     df["month"] = df["date"].dt.to_period("M").astype(str)
     df["text"] = (
