@@ -52,6 +52,8 @@ main{max-width:1200px;margin:0 auto;padding:1.5rem}
 .result-item .result-meta{font-size:.75rem;color:var(--text-muted);margin-top:.25rem;display:flex;gap:.75rem;flex-wrap:wrap}
 .result-item .cat-badge{background:var(--accent-light);color:var(--accent);padding:.1rem .4rem;border-radius:4px;font-size:.7rem}
 .result-item strong{background:rgba(255,200,0,0.2);padding:0 2px;border-radius:2px}
+.shortfall{background:var(--accent-light);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;padding:1rem 1.2rem;margin-bottom:1.5rem;font-size:.82rem;line-height:1.6;color:var(--text)}
+.shortfall strong{font-weight:600}.shortfall .sf-title{font-weight:600;margin-bottom:.3rem;font-size:.85rem}
 .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted);font-size:.9rem}.empty-state .big{font-size:2rem;margin-bottom:.5rem}
 .loading{text-align:center;padding:4rem 1rem;color:var(--text-muted)}.loading::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--border-light);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-left:.5rem;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -158,19 +160,24 @@ function eventAnnotations(labels){
 const SOURCES={
   '1tv':{color:'#0066cc',label:'1TV',unit:'segments',dataDir:'data',hasCats:true,hasRu:true,
     desc:'Channel One <span class="ru">Первый канал</span>',
-    blurb:'Russia\'s largest state broadcaster. Segment descriptions machine-translated to English, classified into 10 categories.'},
+    blurb:'Russia\'s largest state broadcaster. Segment descriptions machine-translated to English, classified into 10 categories.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>All segment descriptions were <strong>machine-translated</strong> from Russian via Google Translate; some nuance may be lost. Native 1TV categories had low classifier confidence for 38% of items (pred_confidence&lt;0.35), so these were <strong>reclassified via keyword matching</strong> into the unified taxonomy. Coverage is comprehensive: 2000&ndash;2026.'},
   'kremlin':{color:'#059669',label:'Kremlin',unit:'speeches',dataDir:'data/kremlin',hasCats:true,hasRu:false,
     desc:'Kremlin Speeches <span class="ru">Кремль</span>',
-    blurb:'Prepared ceremonial remarks from en.kremlin.ru. Award ceremonies, state visits, commemorations, and national holidays.'},
+    blurb:'Prepared ceremonial remarks from en.kremlin.ru. Award ceremonies, state visits, commemorations, and national holidays.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>This dataset contains <strong>only prepared ceremonial remarks</strong> from the <code>/transcripts/speeches/</code> subcategory on kremlin.ru. Official policy statements, meeting transcripts, press conferences, and press statements are <strong>excluded</strong> because kremlin.ru\'s pagination broke between Dec 26, 2025 and Jan 2, 2026 &mdash; all pagination pages now return identical results, making historical scraping of other categories impossible. The 1,402 speeches were successfully collected on Dec 26, 2025 before this bug appeared. This means major policy events (e.g. the 2008 Georgia war declaration) are <strong>invisible</strong> in this dataset because they were delivered as statements, not speeches.'},
   'tass':{color:'#DC2626',label:'TASS',unit:'articles',dataDir:'data/tass',hasCats:true,hasRu:false,
     desc:'TASS <span class="ru">ТАСС</span>',
-    blurb:'English-language articles from Russia\'s official news agency.'},
+    blurb:'English-language articles from Russia\'s official news agency.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>Coverage is <strong>limited to ~9 months</strong> (Jun 2025&ndash;Mar 2026). TASS\'s news sitemaps (<code>sitemap_news*</code>) appear to contain <strong>only recent URLs</strong>; older articles are not indexed in the publicly available sitemaps. There is no publicly accessible TASS archive API. Historical expansion is actively being attempted via sitemap scraping. This is the English-language TASS site only; Russian-language articles are not included.'},
   'mfa':{color:'#7C3AED',label:'MFA',unit:'messages',dataDir:'data/mfa',hasCats:true,hasRu:false,
     desc:'MFA Telegram <span class="ru">МИД</span>',
-    blurb:'Messages from the Russian Foreign Ministry\'s English Telegram channel (@MFARussia).'},
+    blurb:'Messages from the Russian Foreign Ministry\'s English Telegram channel (@MFARussia).',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>Coverage is <strong>limited to ~4 months</strong> (Dec 2025&ndash;Mar 2026). Telegram\'s public web preview (<code>t.me/s/MFARussia</code>) allows backward pagination, but <strong>depth is limited</strong> by Telegram\'s server-side restrictions on how far back the preview will serve. Historical expansion is being attempted. The @MFARussia channel has been active since 2019, so significant history exists but may not be accessible via the web preview interface.'},
   'rt':{color:'#E9C46A',label:'RT',unit:'articles',dataDir:'data/rt',hasCats:true,hasRu:false,
     desc:'RT <span class="ru">Russia Today</span>',
-    blurb:'English-language articles from Russia\'s international state media network. Russia\'s primary English propaganda outlet.'},
+    blurb:'English-language articles from Russia\'s international state media network. Russia\'s primary English propaganda outlet.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>A <strong>2015&ndash;2024 gap</strong> is actively being filled via RT\'s yearly sitemaps (~2,000 sampled articles per year). Pre-2014 articles largely return <strong>404 errors</strong> and cannot be recovered; the Internet Archive has essentially no coverage of rt.com. Post-2022, RT was <strong>banned or restricted in the EU</strong> and sanctioned by multiple Western governments, which may affect article availability from some IP addresses. Current gap-fill has a ~12% failure rate. Geographic sections (news, russia, usa, uk, africa, india) are reclassified into the unified taxonomy by keyword content rather than section name.'},
 };
 const SRC_STYLE={
   '1tv':{color:'#0066cc',dash:[],label:'1TV'},
@@ -288,8 +295,9 @@ async function initSourceTab(id){
   const dStart=summary.date_start||'',dEnd=summary.date_end||'',yrs=summary.years_covered||0;
 
   let html=`<div class="hero-section"><h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">${cfg.desc}</h1>
-    <p class="hero-sub">${cfg.blurb} <strong>${count.toLocaleString()}</strong> ${cfg.unit}, ${dStart.slice(0,4)}&ndash;${dEnd.slice(0,4)}.</p></div>
-    <div class="stat-cards" id="${id}-stats"></div>
+    <p class="hero-sub">${cfg.blurb} <strong>${count.toLocaleString()}</strong> ${cfg.unit}, ${dStart.slice(0,4)}&ndash;${dEnd.slice(0,4)}.</p></div>`;
+  if(cfg.shortfall) html+=`<div class="shortfall">${cfg.shortfall}</div>`;
+  html+=`<div class="stat-cards" id="${id}-stats"></div>
     <div class="glass"><h2>Volume</h2><p class="note">${cfg.label} ${cfg.unit} per month</p><div class="chart-wrap"><canvas id="${id}-vol"></canvas></div></div>`;
   if(cfg.hasCats&&summary.categories&&summary.categories.length)
     html+=`<div class="glass"><h2>Categories</h2><p class="note">Breakdown by category</p><div class="chart-wrap" style="max-height:400px"><canvas id="${id}-cats"></canvas></div></div>`;
