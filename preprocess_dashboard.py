@@ -234,7 +234,14 @@ def apply_unified_categories(df: pd.DataFrame, source: str) -> pd.DataFrame:
             )
         else:
             df["unified_category"] = df["text"].apply(classify_by_keywords)
-    elif source in ("kremlin", "mfa"):
+    elif source == "sputnik":
+        if "category" in df.columns:
+            # Sputnik has article:section (e.g. "News", "World", etc.)
+            # but it's not granular enough — use keyword classification
+            df["unified_category"] = df["text"].apply(classify_by_keywords)
+        else:
+            df["unified_category"] = df["text"].apply(classify_by_keywords)
+    elif source in ("kremlin", "mfa", "mod"):
         df["unified_category"] = df["text"].apply(classify_by_keywords)
     return df
 
@@ -667,6 +674,8 @@ def cross_source_comparison(
     kremlin_df: pd.DataFrame = None,
     mfa_df: pd.DataFrame = None,
     rt_df: pd.DataFrame = None,
+    sputnik_df: pd.DataFrame = None,
+    mod_df: pd.DataFrame = None,
 ) -> None:
     """Generate cross-source keyword comparison data."""
     compare_dir = DATA_DIR / "compare"
@@ -679,6 +688,10 @@ def cross_source_comparison(
         sources.append(("mfa", mfa_df))
     if rt_df is not None and len(rt_df) > 0:
         sources.append(("rt", rt_df))
+    if sputnik_df is not None and len(sputnik_df) > 0:
+        sources.append(("sputnik", sputnik_df))
+    if mod_df is not None and len(mod_df) > 0:
+        sources.append(("mod", mod_df))
 
     results = {}
     for kw in TRACKED_KEYWORDS:
@@ -892,6 +905,186 @@ def rt_stats(df: pd.DataFrame) -> None:
     )
 
 
+# ── Sputnik data generation ─────────────────────────────────────────────────
+
+def load_sputnik() -> pd.DataFrame:
+    """Load Sputnik articles CSV if available."""
+    path = BASE / "sputnik_articles.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, low_memory=False)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    n_nat = df["date"].isna().sum()
+    if n_nat > 0:
+        print(f"  Sputnik: dropping {n_nat} articles with missing dates")
+        df = df.dropna(subset=["date"]).reset_index(drop=True)
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = (
+        df["title"].fillna("").astype(str)
+        + " "
+        + df["content"].fillna("").astype(str)
+        + " "
+        + df["lead"].fillna("").astype(str)
+    ).str.lower()
+    df = apply_unified_categories(df, "sputnik")
+    return df
+
+
+def sputnik_stats(df: pd.DataFrame) -> None:
+    """Generate Sputnik summary, volume, keywords, and category data."""
+    sputnik_dir = DATA_DIR / "sputnik"
+    sputnik_dir.mkdir(parents=True, exist_ok=True)
+
+    stats = {
+        "total_articles": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_content_len": round(df["content"].astype(str).str.len().mean(), 0),
+        "categories": [
+            {"name": str(c), "count": int(n)}
+            for c, n in df["unified_category"].value_counts().items()
+        ] if "unified_category" in df.columns else [],
+    }
+    (sputnik_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  sputnik/summary.json: {stats['total_articles']} articles")
+
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (sputnik_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  sputnik/monthly_volume.json: {len(data)} months")
+
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (sputnik_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  sputnik/keyword_trends.json: {len(kw_results)} keywords")
+
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (sputnik_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  sputnik/country_mentions.json: {len(co_results)} countries")
+
+    _generic_search_shards(
+        df, sputnik_dir / "search",
+        title_col="title", content_col="content",
+        url_col="url", cat_col="unified_category",
+    )
+
+
+# ── MOD Telegram data generation ───────────────────────────────────────────────
+
+def load_mod() -> pd.DataFrame:
+    """Load MOD Telegram messages CSV if available."""
+    path = BASE / "mod_telegram.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, low_memory=False)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.to_period("M").astype(str)
+    df["text"] = df["text"].fillna("").astype(str).str.lower()
+    df = apply_unified_categories(df, "mod")
+    return df
+
+
+def mod_stats(df: pd.DataFrame) -> None:
+    """Generate MOD summary, volume, keywords, and country data."""
+    mod_dir = DATA_DIR / "mod"
+    mod_dir.mkdir(parents=True, exist_ok=True)
+
+    cats = df["unified_category"].value_counts() if "unified_category" in df.columns else pd.Series(dtype=int)
+    stats = {
+        "total_messages": len(df),
+        "date_start": str(df["date"].min().date()) if len(df) else "",
+        "date_end": str(df["date"].max().date()) if len(df) else "",
+        "years_covered": int(df["year"].nunique()),
+        "avg_text_len": round(df["text"].str.len().mean(), 0),
+        "categories": [
+            {"name": str(c), "count": int(n)} for c, n in cats.items()
+        ],
+    }
+    (mod_dir / "summary.json").write_text(json.dumps(stats))
+    print(f"  mod/summary.json: {stats['total_messages']} messages")
+
+    counts = df.groupby("month").size().reset_index(name="count")
+    data = [{"month": r["month"], "count": int(r["count"])} for _, r in counts.iterrows()]
+    (mod_dir / "monthly_volume.json").write_text(json.dumps(data))
+    print(f"  mod/monthly_volume.json: {len(data)} months")
+
+    kw_results = {}
+    for kw in TRACKED_KEYWORDS:
+        pattern = re.compile(r"\b" + re.escape(kw) + r"\b", re.IGNORECASE)
+        monthly = (
+            df.assign(has_kw=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has_kw"]
+            .mean()
+            .reset_index()
+        )
+        kw_results[kw] = [
+            {"month": r["month"], "pct": round(float(r["has_kw"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (mod_dir / "keyword_trends.json").write_text(json.dumps(kw_results))
+    print(f"  mod/keyword_trends.json: {len(kw_results)} keywords")
+
+    co_results = {}
+    for country in COUNTRY_DISPLAY:
+        terms = [country]
+        for alias, canonical in COUNTRY_ALIASES.items():
+            if canonical == country:
+                terms.append(alias)
+        pattern = re.compile(
+            r"\b(" + "|".join(re.escape(t) for t in terms) + r")\b", re.IGNORECASE
+        )
+        monthly = (
+            df.assign(has=df["text"].str.contains(pattern, na=False))
+            .groupby("month")["has"]
+            .mean()
+            .reset_index()
+        )
+        co_results[country] = [
+            {"month": r["month"], "pct": round(float(r["has"]) * 100, 2)}
+            for _, r in monthly.iterrows()
+        ]
+    (mod_dir / "country_mentions.json").write_text(json.dumps(co_results))
+    print(f"  mod/country_mentions.json: {len(co_results)} countries")
+
+    _generic_search_shards(
+        df, mod_dir / "search",
+        title_col="text", content_col="text",
+        cat_col="unified_category",
+    )
+
+
 def overview_summary(
     sources: dict,
 ) -> None:
@@ -1039,10 +1232,32 @@ def main():
     else:
         print("No RT data found, skipping.\n")
 
-    all_sources = [("1tv", df), ("tass", tass_df), ("kremlin", kremlin_df), ("mfa", mfa_df), ("rt", rt_df)]
+    print("\nLoading Sputnik data...")
+    sputnik_df = load_sputnik()
+    if len(sputnik_df) > 0:
+        print(f"Loaded {len(sputnik_df)} Sputnik rows.\n")
+        print("Generating Sputnik JSON files:")
+        sputnik_stats(sputnik_df)
+    else:
+        print("No Sputnik data found, skipping.\n")
+
+    print("\nLoading MOD Telegram data...")
+    mod_df = load_mod()
+    if len(mod_df) > 0:
+        print(f"Loaded {len(mod_df)} MOD messages.\n")
+        print("Generating MOD JSON files:")
+        mod_stats(mod_df)
+    else:
+        print("No MOD data found, skipping.\n")
+
+    all_sources = [
+        ("1tv", df), ("tass", tass_df), ("kremlin", kremlin_df),
+        ("mfa", mfa_df), ("rt", rt_df), ("sputnik", sputnik_df),
+        ("mod", mod_df),
+    ]
 
     print("\nGenerating cross-source comparison:")
-    cross_source_comparison(df, tass_df, kremlin_df, mfa_df, rt_df)
+    cross_source_comparison(df, tass_df, kremlin_df, mfa_df, rt_df, sputnik_df, mod_df)
 
     print("\nGenerating cross-source country comparison:")
     cross_source_country_comparison(all_sources)
@@ -1057,6 +1272,8 @@ def main():
         "TASS": tass_df,
         "MFA": mfa_df,
         "RT": rt_df,
+        "Sputnik": sputnik_df,
+        "MOD": mod_df,
     })
 
     print("\nDone!")

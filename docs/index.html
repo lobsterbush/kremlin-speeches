@@ -81,13 +81,16 @@ footer{max-width:1200px;margin:2rem auto;padding:1.5rem;text-align:center;font-s
   <button class="tab" data-tab="tass" role="tab">TASS</button>
   <button class="tab" data-tab="mfa" role="tab">MFA</button>
   <button class="tab" data-tab="rt" role="tab">RT</button>
+  <button class="tab" data-tab="sputnik" role="tab">Sputnik</button>
+  <button class="tab" data-tab="mod" role="tab">MOD</button>
   <button class="tab" data-tab="compare" role="tab">Compare</button>
+  <button class="tab" data-tab="methods" role="tab">Methods</button>
 </div>
 <main>
 <section id="tab-overview" class="tab-content active">
   <div class="hero-section">
     <h1 class="hero-title">Kremlin Media Tracker</h1>
-    <p class="hero-sub">Multi-source tracking of Russian state media and official communications. Five sources: Channel One (1TV), Kremlin speeches, TASS, MFA Telegram, and RT. Updated daily via GitHub Actions.</p>
+    <p class="hero-sub">Multi-source tracking of Russian state media and official communications. Seven sources: Channel One (1TV), Kremlin speeches, TASS, MFA Telegram, RT, Sputnik, and MOD Telegram. Updated daily via GitHub Actions.</p>
   </div>
   <div id="ov-source-cards" class="source-cards"></div>
   <div class="glass">
@@ -102,10 +105,12 @@ footer{max-width:1200px;margin:2rem auto;padding:1.5rem;text-align:center;font-s
 <section id="tab-tass" class="tab-content"><div class="loading">Loading TASS data</div></section>
 <section id="tab-mfa" class="tab-content"><div class="loading">Loading MFA data</div></section>
 <section id="tab-rt" class="tab-content"><div class="loading">Loading RT data</div></section>
+<section id="tab-sputnik" class="tab-content"><div class="loading">Loading Sputnik data</div></section>
+<section id="tab-mod" class="tab-content"><div class="loading">Loading MOD data</div></section>
 <section id="tab-compare" class="tab-content">
   <div class="hero-section">
     <h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">Cross-Source Comparison</h1>
-    <p class="hero-sub">Compare keyword and country coverage across all five sources.</p>
+    <p class="hero-sub">Compare keyword and country coverage across all seven sources.</p>
   </div>
   <div class="glass">
     <h2>Keyword Comparison</h2>
@@ -125,9 +130,49 @@ footer{max-width:1200px;margin:2rem auto;padding:1.5rem;text-align:center;font-s
     <div class="chart-wrap" style="height:400px"><canvas id="cmpCatChart"></canvas></div>
   </div>
 </section>
+<section id="tab-methods" class="tab-content">
+  <div class="hero-section">
+    <h1 class="hero-title" style="font-size:clamp(1.2rem,2.5vw,1.6rem)">Methodology</h1>
+    <p class="hero-sub">How data is collected, processed, and classified across all sources.</p>
+  </div>
+  <div class="glass">
+    <h2>Data Collection</h2>
+    <p class="note">Each source is scraped using purpose-built Python scripts.</p>
+    <p style="font-size:.85rem;line-height:1.7"><strong>1TV (Channel One)</strong> &mdash; 1tv.ru segment descriptions scraped and machine-translated from Russian to English via Google Translate. Covers 2000&ndash;2026.<br>
+    <strong>Kremlin Speeches</strong> &mdash; Scraped from en.kremlin.ru/events/president/transcripts/speeches. Only ceremonial prepared remarks; other subcategories lost to a pagination bug (Dec 2025).<br>
+    <strong>TASS</strong> &mdash; English-language tass.com articles via news sitemaps and RSS. Sitemap scraping ongoing for historical expansion.<br>
+    <strong>MFA Telegram</strong> &mdash; @MFARussia channel scraped via Telegram public web preview (t.me/s/MFARussia), paginating backward to Nov 2016.<br>
+    <strong>RT</strong> &mdash; rt.com English articles via RSS, yearly sitemaps (gzipped), and targeted gap-fill scraping for 2015&ndash;2024.<br>
+    <strong>Sputnik</strong> &mdash; sputnikglobe.com articles via monthly sitemaps (267 months, 2004&ndash;present) and RSS. Sampled ~200 articles/month for broad coverage.<br>
+    <strong>MOD Telegram</strong> &mdash; @mod_russia_en channel scraped via the same Telegram web preview approach as MFA.</p>
+  </div>
+  <div class="glass">
+    <h2>Category Classification</h2>
+    <p class="note">All sources are mapped to 7 unified categories.</p>
+    <p style="font-size:.85rem;line-height:1.7">The unified taxonomy contains: <strong>Politics &amp; Government</strong>, <strong>Economy &amp; Business</strong>, <strong>Military &amp; Security</strong>, <strong>International Affairs</strong>, <strong>Society &amp; Culture</strong>, <strong>Science &amp; Health</strong>, and <strong>Sports</strong>.</p>
+    <p style="font-size:.85rem;line-height:1.7;margin-top:.5rem"><strong>Sources with native categories</strong> (1TV, TASS, RT) are mapped via lookup tables. For 1TV, items with low native classifier confidence (&lt;0.35) fall back to keyword classification. RT geographic sections (news, russia, usa, etc.) are reclassified by keyword content.</p>
+    <p style="font-size:.85rem;line-height:1.7;margin-top:.5rem"><strong>Sources without native categories</strong> (Kremlin, MFA, MOD, Sputnik) use a keyword-based classifier. Each category has a curated keyword list (e.g. &ldquo;military&rdquo;, &ldquo;army&rdquo;, &ldquo;missile&rdquo; &rarr; Military &amp; Security). Text is matched with word-boundary regex; the category with the most distinct keyword hits wins. Default is Politics &amp; Government.</p>
+  </div>
+  <div class="glass">
+    <h2>Keyword &amp; Country Tracking</h2>
+    <p class="note">23 keywords and 16 countries are tracked across all sources.</p>
+    <p style="font-size:.85rem;line-height:1.7"><strong>Keywords</strong>: ukraine, military, putin, china, sanctions, nato, syria, crimea, war, economy, nuclear, election, terrorism, covid, pandemic, gas, europe, united, security, defense, biden, trump, obama.</p>
+    <p style="font-size:.85rem;line-height:1.7;margin-top:.5rem"><strong>Countries</strong>: Ukraine, China, United States, United Kingdom, Germany, France, Syria, Turkey, Japan, India, Belarus, Georgia, Iran, Israel, Poland, Kazakhstan. Demonym aliases are resolved (e.g. &ldquo;American&rdquo; &rarr; United States).</p>
+    <p style="font-size:.85rem;line-height:1.7;margin-top:.5rem">All matching uses precompiled word-boundary regex (<code>\bkeyword\b</code>) to avoid partial matches.</p>
+  </div>
+  <div class="glass">
+    <h2>Search</h2>
+    <p class="note">Client-side full-text search across all sources.</p>
+    <p style="font-size:.85rem;line-height:1.7">Search indices are pre-generated as year-sharded JSON files. Each entry contains: title (truncated), date, category, snippet (60 chars), and source URL. Search is performed client-side via substring matching on title, snippet, and Russian title (where available).</p>
+  </div>
+  <div class="glass">
+    <h2>Limitations</h2>
+    <p style="font-size:.85rem;line-height:1.7">See the &ldquo;Data Notes&rdquo; callout on each source tab for source-specific limitations. General limitations include: keyword classification is imperfect (no ML models for most sources); 1TV content is machine-translated; Kremlin data excludes 4 of 5 communication types; temporal coverage varies widely by source; all text analysis is English-language only.</p>
+  </div>
+</section>
 </main>
 <footer>
-  <p>Data: <a href="https://www.1tv.ru">1tv.ru</a> &middot; <a href="http://en.kremlin.ru">kremlin.ru</a> &middot; <a href="https://tass.com">TASS</a> &middot; <a href="https://t.me/s/MFARussia">MFA Telegram</a> &middot; <a href="https://www.rt.com">RT</a></p>
+  <p>Data: <a href="https://www.1tv.ru">1tv.ru</a> &middot; <a href="http://en.kremlin.ru">kremlin.ru</a> &middot; <a href="https://tass.com">TASS</a> &middot; <a href="https://t.me/s/MFARussia">MFA Telegram</a> &middot; <a href="https://www.rt.com">RT</a> &middot; <a href="https://sputnikglobe.com">Sputnik</a> &middot; <a href="https://t.me/s/mod_russia_en">MOD Telegram</a></p>
   <p style="margin-top:.4rem">Charles Crabtree &middot; Senior Lecturer, School of Social Sciences, Monash University &amp; K-Club Professor, University College, Korea University</p>
   <p style="margin-top:.4rem"><a href="https://github.com/lobsterbush/kremlin-speeches">GitHub</a></p>
 </footer>
@@ -178,6 +223,14 @@ const SOURCES={
     desc:'RT <span class="ru">Russia Today</span>',
     blurb:'English-language articles from Russia\'s international state media network. Russia\'s primary English propaganda outlet.',
     shortfall:'<div class="sf-title">&#9432; Data Notes</div>A <strong>2015&ndash;2024 gap</strong> is actively being filled via RT\'s yearly sitemaps (~2,000 sampled articles per year). Pre-2014 articles largely return <strong>404 errors</strong> and cannot be recovered; the Internet Archive has essentially no coverage of rt.com. Post-2022, RT was <strong>banned or restricted in the EU</strong> and sanctioned by multiple Western governments, which may affect article availability from some IP addresses. Current gap-fill has a ~12% failure rate. Geographic sections (news, russia, usa, uk, africa, india) are reclassified into the unified taxonomy by keyword content rather than section name.'},
+  'sputnik':{color:'#D62828',label:'Sputnik',unit:'articles',dataDir:'data/sputnik',hasCats:true,hasRu:false,
+    desc:'Sputnik International <span class="ru">Спутник</span>',
+    blurb:'Russia\'s other major English-language state media outlet (sputnikglobe.com). Complementary to RT in Russia\'s international propaganda infrastructure.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>Historical data collected via <strong>monthly sitemaps</strong> (267 months, Jan 2004&ndash;present) with ~200 articles sampled per month. This provides broad temporal coverage but not exhaustive article capture. Sputnik was formerly sputniknews.com; old URLs redirect to sputnikglobe.com. Post-2022, Sputnik was <strong>banned in the EU</strong> alongside RT. Category classification is keyword-based since Sputnik\'s native <code>article:section</code> tags are not granular enough.'},
+  'mod':{color:'#457B9D',label:'MOD',unit:'messages',dataDir:'data/mod',hasCats:true,hasRu:false,
+    desc:'MOD Telegram <span class="ru">Минобороны</span>',
+    blurb:'Messages from the Russian Ministry of Defence\'s English Telegram channel (@mod_russia_en). Military communications and operational updates.',
+    shortfall:'<div class="sf-title">&#9432; Data Notes</div>Scraped via Telegram\'s public web preview (<code>t.me/s/mod_russia_en</code>), paginating backward through full channel history. Messages are <strong>short-form Telegram posts</strong>, often containing daily briefings, casualty claims, and operational summaries. Some messages are photo/video-only with no text. Category classification is keyword-based. Content is heavily weighted toward <strong>Military &amp; Security</strong> by nature.'},
 };
 const SRC_STYLE={
   '1tv':{color:'#0066cc',dash:[],label:'1TV'},
@@ -185,9 +238,11 @@ const SRC_STYLE={
   'kremlin':{color:'#059669',dash:[2,3],label:'Kremlin'},
   'mfa':{color:'#7C3AED',dash:[8,4,2,4],label:'MFA'},
   'rt':{color:'#E9C46A',dash:[4,2],label:'RT'},
+  'sputnik':{color:'#D62828',dash:[10,3],label:'Sputnik'},
+  'mod':{color:'#457B9D',dash:[3,3],label:'MOD'},
 };
-const srcColors={'1TV':'#0066cc','Kremlin':'#059669','TASS':'#DC2626','MFA':'#7C3AED','RT':'#E9C46A'};
-const srcTabs={'1TV':'1tv','Kremlin':'kremlin','TASS':'tass','MFA':'mfa','RT':'rt'};
+const srcColors={'1TV':'#0066cc','Kremlin':'#059669','TASS':'#DC2626','MFA':'#7C3AED','RT':'#E9C46A','Sputnik':'#D62828','MOD':'#457B9D'};
+const srcTabs={'1TV':'1tv','Kremlin':'kremlin','TASS':'tass','MFA':'mfa','RT':'rt','Sputnik':'sputnik','MOD':'mod'};
 
 /* ── TABS + HASH ROUTING ── */
 function activateTab(id){
@@ -198,6 +253,7 @@ function activateTab(id){
   document.getElementById('tab-'+id).classList.add('active');
   if(SOURCES[id]&&!window['_init_'+id])initSourceTab(id);
   if(id==='compare'&&!window._cmpInit)initCompare();
+  if(id==='methods'){}/* static content, no init needed */
   window.scrollTo({top:0});
 }
 document.querySelectorAll('.tab').forEach(t=>{
